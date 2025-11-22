@@ -9,15 +9,15 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RichTextEditor } from '@/components/content/rich-text-editor';
-import { FaqEditor } from '@/components/content/faq-field';
+import { RichTextEditor } from '@/components/features/content/rich-text-editor';
+import { FaqEditor } from '@/components/features/content/faq-field';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
-import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
-import { VettingAgencyFeedbackCard } from '@/components/content/vetting-agency-feedback-card';
-import { BrandIcon,  } from '@/components/brand-icon';
+import { ContentApprovalWorkflow, WorkflowStep } from '@/components/features/content/content-approval-workflow';
+import { VettingAgencyFeedbackCard } from '@/components/features/content/vetting-agency-feedback-card';
+import { BrandIcon, } from '@/components/features/brands/brand-icon';
 import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
-import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle,  } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useAutoSave } from '@/hooks/use-auto-save';
@@ -62,16 +62,16 @@ interface UserSessionData {
   id: string;
   email?: string;
   user_metadata?: {
-    role?: string; 
+    role?: string;
     full_name?: string;
     avatar_url?: string;
   };
   brand_permissions?: Array<{
     brand_id: string;
-    role: string; 
+    role: string;
   }>;
-  avatar_url?: string; 
-  full_name?: string; 
+  avatar_url?: string;
+  full_name?: string;
 }
 
 // Add ContentVersion if it's not identical to the one in view page, or import if sharable
@@ -100,7 +100,7 @@ interface TemplateOutputField {
 }
 
 interface TemplateFields {
-  inputFields: unknown[]; 
+  inputFields: unknown[];
   outputFields: TemplateOutputField[];
 }
 
@@ -149,14 +149,14 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const [lastSaveSource, setLastSaveSource] = useState<'manual' | 'auto' | null>(null);
   const fetchingRef = React.useRef(false);
   const markAsSavedRef = React.useRef<(data?: ContentState) => void>();
-  
+
   // User and Permissions State
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [userError, setUserError] = useState<string | null>(null);
   const [isAllowedToEdit, setIsAllowedToEdit] = useState<boolean>(false);
   const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
-  
+
   const [content, setContent] = useState<ContentState>({
     id: '',
     title: '',
@@ -228,13 +228,13 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       setIsLoadingUser(true);
       setUserError(null);
       try {
-        const response = await fetch('/api/me');
+        const response = await apiFetch('/api/me');
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -263,7 +263,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       setIsCheckingPermissions(true);
       const userRole = currentUser.user_metadata?.role;
       let allowed = false;
-      
+
       // First check if content is approved - if so, no one can edit it
       if (content.status === 'approved' || content.status === 'published') {
         allowed = false;
@@ -280,10 +280,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     } else if (!isLoadingUser && (!currentUser || !content.id)) {
       // If user is loaded but no user, or content not loaded yet (or no brand_id), deny permission until data is ready
       setIsAllowedToEdit(false);
-      setIsCheckingPermissions(false); 
+      setIsCheckingPermissions(false);
     }
     // Do not run if content.id or content.brand_id is not yet available from fetchAllData
-  }, [currentUser, isLoadingUser, content.id, content.brand_id, content.status]); 
+  }, [currentUser, isLoadingUser, content.id, content.brand_id, content.status]);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -295,8 +295,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       setIsLoading(true);
       try {
         const [contentResponse, versionsResponse] = await Promise.all([
-          fetch(`/api/content/${id}`),
-          fetch(`/api/content/${id}/versions`)
+          apiFetch(`/api/content/${id}`),
+          apiFetch(`/api/content/${id}/versions`)
         ]);
 
         if (!contentResponse.ok) {
@@ -343,7 +343,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
           if (contentResult.data.brand_id) {
             try {
-              const brandResponse = await fetch(`/api/brands/${contentResult.data.brand_id}`);
+              const brandResponse = await apiFetch(`/api/brands/${contentResult.data.brand_id}`);
               if (brandResponse.ok) {
                 const brandJson = await brandResponse.json();
                 if (brandJson.success && brandJson.brand) {
@@ -356,11 +356,11 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           }
 
           if (contentResult.data.workflow_id && !contentResult.data.workflow?.steps) {
-            const wfResponse = await fetch(`/api/workflows/${contentResult.data.workflow_id}`);
+            const wfResponse = await apiFetch(`/api/workflows/${contentResult.data.workflow_id}`);
             if (wfResponse.ok) {
               const wfData = await wfResponse.json();
               if (wfData.success && wfData.workflow) {
-                setContent(prev => ({...prev, workflow: wfData.workflow }));
+                setContent(prev => ({ ...prev, workflow: wfData.workflow }));
               }
             }
           }
@@ -368,9 +368,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           // Fetch template data if template_id exists
           if (contentResult.data.template_id) {
             try {
-              const templateResponse = await fetch(`/api/content-templates/${contentResult.data.template_id}`);
+              const templateResponse = await apiFetch(`/api/content-templates/${contentResult.data.template_id}`);
               const templateRes = await templateResponse.json();
-              
+
               if (templateRes.success && templateRes.template) {
                 const fetchedApiTemplate = templateRes.template;
                 // Reshape the fetched template to match the component's Template interface
@@ -413,12 +413,12 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         fetchingRef.current = false;
       }
     };
-    
+
     if (id && currentUser?.id) {
       fetchAllData();
     }
   }, [id, currentUser]);
-  
+
   // Handler for dynamic output field changes
   const handleGeneratedOutputChange = (outputFieldId: string, value: NormalizedContent) => {
     setContent(prev => {
@@ -441,7 +441,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     setLastSavedAt(null);
     setLastSaveSource(null);
   };
-  
+
   const saveContent = useCallback(
     async (mode: 'manual' | 'auto'): Promise<boolean> => {
       if (mode === 'manual') {
@@ -539,7 +539,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   useEffect(() => {
     contentSaveRef.current = handleSave;
   }, [handleSave]);
-  
+
   const handleWorkflowActionCompletion = () => {
     // This function is called AFTER the workflow action in ContentApprovalWorkflow is successful.
     // Now, redirect.
@@ -552,7 +552,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     setAutoSaveError(null);
     setAutoSaveEnabled(true);
   };
-  
+
   const { isSaving: isAutoSaving, markAsSaved } = useAutoSave({
     data: content,
     onSave: async () => {
@@ -585,7 +585,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           <Skeleton className="h-10 w-1/3" />
           <Skeleton className="h-10 w-24" />
         </div>
-        <Skeleton className="h-8 w-1/2 mb-4" /> 
+        <Skeleton className="h-8 w-1/2 mb-4" />
         <Card>
           <CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader>
           <CardContent className="space-y-4">
@@ -608,7 +608,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       </div>
     );
   }
-  
+
   if (!isAllowedToEdit) {
     const isApproved = content.status === 'approved' || content.status === 'published';
     return (
@@ -729,35 +729,35 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                 <CardTitle>Content Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title (auto-generated)</Label>
-                <Input id="title" name="title" value={content.title} readOnly disabled />
-                <p className="text-xs text-muted-foreground mt-1">Titles are generated automatically and cannot be edited.</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Content Template</Label><Input value={content.template_name || 'N/A'} disabled /></div>
-                <div><Label>Brand</Label><Input value={content.brand_name || 'N/A'} disabled /></div>
-              </div>
-              <div>
-                <Label htmlFor="due-date">Due Date (Optional)</Label>
-                <DatePicker
-                  date={content.due_date ? new Date(content.due_date) : undefined}
-                  onDateChange={(date) => {
-                    setContent(prev => ({ ...prev, due_date: date?.toISOString() || null }));
-                    setHasUnsavedChanges(true);
-                    setLastSavedAt(null);
-                    setLastSaveSource(null);
-                  }}
-                  placeholder="Select a due date"
-                  disabled={false}
-                />
-                <p className="text-sm text-muted-foreground mt-1">
-                  Set a due date for when this content should be published or reviewed
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          
+                <div>
+                  <Label htmlFor="title">Title (auto-generated)</Label>
+                  <Input id="title" name="title" value={content.title} readOnly disabled />
+                  <p className="text-xs text-muted-foreground mt-1">Titles are generated automatically and cannot be edited.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><Label>Content Template</Label><Input value={content.template_name || 'N/A'} disabled /></div>
+                  <div><Label>Brand</Label><Input value={content.brand_name || 'N/A'} disabled /></div>
+                </div>
+                <div>
+                  <Label htmlFor="due-date">Due Date (Optional)</Label>
+                  <DatePicker
+                    date={content.due_date ? new Date(content.due_date) : undefined}
+                    onDateChange={(date) => {
+                      setContent(prev => ({ ...prev, due_date: date?.toISOString() || null }));
+                      setHasUnsavedChanges(true);
+                      setLastSavedAt(null);
+                      setLastSaveSource(null);
+                    }}
+                    placeholder="Select a due date"
+                    disabled={false}
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Set a due date for when this content should be published or reviewed
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
             {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && (
               <Card>
                 <CardHeader>
@@ -833,60 +833,60 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
         <aside className="flex min-h-0 flex-col overflow-hidden lg:w-[360px] lg:shrink-0 lg:pl-1">
           <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
-          {content.workflow_id && (
-            <VettingAgencyFeedbackCard
-              contentId={content.id}
-              brandName={content.brand_name || activeBrandData?.name || 'Brand'}
-              agencies={selectedVettingAgencies}
-              outputFieldLabels={outputFieldIdToNameMap}
-              stageId={currentStageId}
-              stageName={currentWorkflowStep?.name || null}
-              existingFeedback={currentStageFeedback}
-              onFeedbackUpdated={(result) => {
-                if (!result) return;
-                const stageKey = result.stageId || currentStageId;
-                if (!stageKey) {
-                  return;
-                }
-                setContent(prev => {
-                  const existingData = (prev.content_data || {}) as Record<string, unknown>;
-                  const previousFeedback = (existingData.vettingFeedback as Record<string, VettingFeedbackStageResult> | undefined) ?? {};
-                  return {
-                    ...prev,
-                    content_data: {
-                      ...existingData,
-                      vettingFeedback: {
-                        ...previousFeedback,
-                        [stageKey]: result,
+            {content.workflow_id && (
+              <VettingAgencyFeedbackCard
+                contentId={content.id}
+                brandName={content.brand_name || activeBrandData?.name || 'Brand'}
+                agencies={selectedVettingAgencies}
+                outputFieldLabels={outputFieldIdToNameMap}
+                stageId={currentStageId}
+                stageName={currentWorkflowStep?.name || null}
+                existingFeedback={currentStageFeedback}
+                onFeedbackUpdated={(result) => {
+                  if (!result) return;
+                  const stageKey = result.stageId || currentStageId;
+                  if (!stageKey) {
+                    return;
+                  }
+                  setContent(prev => {
+                    const existingData = (prev.content_data || {}) as Record<string, unknown>;
+                    const previousFeedback = (existingData.vettingFeedback as Record<string, VettingFeedbackStageResult> | undefined) ?? {};
+                    return {
+                      ...prev,
+                      content_data: {
+                        ...existingData,
+                        vettingFeedback: {
+                          ...previousFeedback,
+                          [stageKey]: result,
+                        },
                       },
-                    },
-                  };
-                });
-              }}
-              autoRun
-            />
-          )}
+                    };
+                  });
+                }}
+                autoRun
+              />
+            )}
 
-          {content.workflow && content.workflow.steps && content.current_step && (
-            <ContentApprovalWorkflow
-              contentId={content.id}
-              contentTitle={content.title}
-              currentStepObject={currentWorkflowStep}
-              isCurrentUserStepOwner={isCurrentUserStepOwner}
-              versions={versions}
-              template={template}
-              onActionComplete={handleWorkflowActionCompletion}
-              performContentSave={handleSave}
-              initialPublishedUrl={content.published_url ?? null}
-            />
-          )}
-          {!content.workflow && (
-            <Card>
-              <CardContent>
-                <p className="py-4 text-muted-foreground">No workflow associated with this content.</p>
-              </CardContent>
-            </Card>
-          )}
+            {content.workflow && content.workflow.steps && content.current_step && (
+              <ContentApprovalWorkflow
+                contentId={content.id}
+                contentTitle={content.title}
+                currentStepObject={currentWorkflowStep}
+                isCurrentUserStepOwner={isCurrentUserStepOwner}
+                versions={versions}
+                template={template}
+                onActionComplete={handleWorkflowActionCompletion}
+                performContentSave={handleSave}
+                initialPublishedUrl={content.published_url ?? null}
+              />
+            )}
+            {!content.workflow && (
+              <Card>
+                <CardContent>
+                  <p className="py-4 text-muted-foreground">No workflow associated with this content.</p>
+                </CardContent>
+              </Card>
+            )}
 
           </div>
         </aside>

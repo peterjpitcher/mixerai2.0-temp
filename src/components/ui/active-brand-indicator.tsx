@@ -1,6 +1,6 @@
 'use client';
 
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { cn } from '@/lib/utils';
 
 interface ActiveBrandIndicatorProps {
@@ -43,7 +43,7 @@ export function ActiveBrandIndicator({
   };
 
   return (
-    <div 
+    <div
       className={cn(
         'flex items-center gap-2 rounded-md border bg-muted/30',
         sizeClasses[size],
@@ -54,9 +54,9 @@ export function ActiveBrandIndicator({
         backgroundColor: brandColor ? `${brandColor}08` : undefined
       }}
     >
-      <BrandIcon 
-        name={brandName} 
-        color={brandColor || undefined} 
+      <BrandIcon
+        name={brandName}
+        color={brandColor || undefined}
         logoUrl={brandLogoUrl || undefined}
         size={size}
       />
@@ -88,7 +88,7 @@ export function ActiveBrandBadge({
   }
 
   return (
-    <div 
+    <div
       className={cn(
         'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
         'bg-muted/50 border',
@@ -99,9 +99,9 @@ export function ActiveBrandBadge({
         backgroundColor: brandColor ? `${brandColor}10` : undefined
       }}
     >
-      <BrandIcon 
-        name={brandName} 
-        color={brandColor || undefined} 
+      <BrandIcon
+        name={brandName}
+        color={brandColor || undefined}
         logoUrl={brandLogoUrl || undefined}
         size="sm"
         className="h-4 w-4"

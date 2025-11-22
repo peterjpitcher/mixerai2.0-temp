@@ -6,9 +6,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { 
-  ArrowLeft, 
-  Trash2, 
+import {
+  ArrowLeft,
+  Trash2,
   AlertCircle,
   Edit,
   Loader2,
@@ -34,7 +34,7 @@ import {
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { touchFriendly } from '@/lib/utils/touch-target';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api-client';
 import {
@@ -102,7 +102,7 @@ export default function UserDetailPage() {
   const [activities, setActivities] = useState<any[]>([]);
   const [activityStats, setActivityStats] = useState<any>(null);
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
-  
+
   useEffect(() => {
     if (!params?.id) return;
 
@@ -112,8 +112,8 @@ export default function UserDetailPage() {
       try {
         // Fetch user, brands, and activity in parallel
         const [userRes, brandsRes, actRes] = await Promise.all([
-          fetch(`/api/users/${params.id}`),
-          fetch('/api/brands?limit=all'),
+          apiFetch(`/api/users/${params.id}`),
+          apiFetch('/api/brands?limit=all'),
           apiFetch(`/api/users/${params.id}/activity`)
         ]);
 
@@ -161,7 +161,7 @@ export default function UserDetailPage() {
       }
     })();
   }, [params?.id, router]);
-  
+
   const handleDeactivate = async () => {
     if (!user) return;
     setIsDeactivating(true);
@@ -188,15 +188,15 @@ export default function UserDetailPage() {
       toast.error("Cannot delete user: Invalid user or parameters.");
       return;
     }
-    
+
     setIsDeleting(true);
-    
+
     try {
       // Call the API route to handle user deletion
       const response = await apiFetch(`/api/users/${params.id}`, {
         method: 'DELETE',
       });
-      
+
       const data = await response.json();
 
       if (data.success) {
@@ -213,25 +213,25 @@ export default function UserDetailPage() {
       setIsDeleting(false);
     }
   };
-  
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
     // Standard 4.6: Use MMMM d, yyyy format
-    return formatDateFns(date, 'MMMM d, yyyy'); 
+    return formatDateFns(date, 'MMMM d, yyyy');
   };
-  
+
   if (isLoading) {
     return (
       <div className="space-y-8">
         {/* Minimal header for loading state */}
         <div className="flex items-center mb-4">
-            <Button variant="outline" size="icon" asChild className="mr-3">
-                 <Link href="/dashboard/users" aria-label="Back to Users">
-                    <ArrowLeft className="h-4 w-4" />
-                </Link>
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">Loading User Details...</h1>
+          <Button variant="outline" size="icon" asChild className="mr-3">
+            <Link href="/dashboard/users" aria-label="Back to Users">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight">Loading User Details...</h1>
         </div>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
@@ -239,22 +239,22 @@ export default function UserDetailPage() {
       </div>
     );
   }
-  
+
   if (!user) {
     return (
       <div className="space-y-8">
         <Breadcrumbs items={[
-            { label: "Dashboard", href: "/dashboard" }, 
-            { label: "Users", href: "/dashboard/users" }, 
-            { label: "User Not Found" }
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Users", href: "/dashboard/users" },
+          { label: "User Not Found" }
         ]} />
         <div className="flex items-center mb-4">
-            <Button variant="outline" size="icon" asChild className="mr-3">
-                 <Link href="/dashboard/users" aria-label="Back to Users">
-                    <ArrowLeft className="h-4 w-4" />
-                </Link>
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">User Not Found</h1>
+          <Button variant="outline" size="icon" asChild className="mr-3">
+            <Link href="/dashboard/users" aria-label="Back to Users">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight">User Not Found</h1>
         </div>
         <Card>
           <CardContent className="pt-6 flex flex-col items-center text-center">
@@ -262,21 +262,21 @@ export default function UserDetailPage() {
             <p className="text-lg font-semibold">User Not Found</p>
             <p className="text-muted-foreground mb-4">The requested user could not be found or loaded.</p>
             <Button asChild variant="outline">
-                <Link href="/dashboard/users">Back to Users List</Link>
+              <Link href="/dashboard/users">Back to Users List</Link>
             </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
-  
+
   const userId = params?.id;
 
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        { label: "Users", href: "/dashboard/users" }, 
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Users", href: "/dashboard/users" },
         { label: user.full_name || user.email || "User Details" }
       ]} />
 
@@ -314,42 +314,42 @@ export default function UserDetailPage() {
           </div>
         </div>
         <div className="flex space-x-2">
-            {userId && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
-                    <span className="sr-only">Open menu</span>
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={`/dashboard/users/${userId}/edit`}>
-                      <Edit className="mr-2 h-4 w-4" /> Edit User
-                    </Link>
+          {userId && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
+                  <span className="sr-only">Open menu</span>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/users/${userId}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" /> Edit User
+                  </Link>
+                </DropdownMenuItem>
+
+                {user?.user_status !== 'inactive' ? (
+                  <DropdownMenuItem onClick={() => setShowDeactivateDialog(true)}>
+                    <UserX className="mr-2 h-4 w-4" /> Deactivate User
                   </DropdownMenuItem>
-
-                  {user?.user_status !== 'inactive' ? (
-                    <DropdownMenuItem onClick={() => setShowDeactivateDialog(true)}>
-                      <UserX className="mr-2 h-4 w-4" /> Deactivate User
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem onClick={handleReactivate}>
-                      <UserCheck className="mr-2 h-4 w-4" /> Reactivate User
-                    </DropdownMenuItem>
-                  )}
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem 
-                    onClick={() => setShowDeleteDialog(true)} 
-                    className="text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete User
+                ) : (
+                  <DropdownMenuItem onClick={handleReactivate}>
+                    <UserCheck className="mr-2 h-4 w-4" /> Reactivate User
                   </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                )}
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete User
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -358,7 +358,7 @@ export default function UserDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <UserCircle2 className="mr-2 h-5 w-5 text-primary" /> Profile Information
-            </CardTitle>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -385,8 +385,8 @@ export default function UserDetailPage() {
               {user.brand_permissions.map(permission => (
                 <li key={permission.id || permission.brand_id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
                   <div className="flex items-center gap-3">
-                    <BrandIcon 
-                      name={permission.brand?.name || 'Unknown Brand'} 
+                    <BrandIcon
+                      name={permission.brand?.name || 'Unknown Brand'}
                       color={permission.brand?.brand_color || '#cccccc'}
                       logoUrl={permission.brand?.logo_url}
                     />
@@ -440,7 +440,7 @@ export default function UserDetailPage() {
                   </div>
                 </div>
               )}
-              
+
               {/* Activity Timeline */}
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {activities.slice(0, 20).map((activity, index) => (
@@ -466,7 +466,7 @@ export default function UserDetailPage() {
                   </div>
                 ))}
               </div>
-              
+
               {activities.length > 20 && (
                 <p className="text-sm text-muted-foreground text-center pt-2">
                   Showing 20 of {activities.length} activities
@@ -478,7 +478,7 @@ export default function UserDetailPage() {
           )}
         </CardContent>
       </Card>
-      
+
       <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
         <DialogContent>
           <DialogHeader>

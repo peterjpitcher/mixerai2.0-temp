@@ -3,8 +3,8 @@ import Image from 'next/image';
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
-import { LoginForm } from "@/components/login-form";
-import { Spinner } from '@/components/spinner';
+import { LoginForm } from "@/components/features/auth/login-form";
+import { Spinner } from '@/components/ui/spinner';
 
 export const metadata: Metadata = {
   title: 'Login | MixerAI 2.0',
@@ -21,12 +21,12 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="flex justify-center">
           <Link href="/" aria-label="Go to homepage">
-            <Image 
-              src="/Mixerai2.0Logo.png" 
+            <Image
+              src="/Mixerai2.0Logo.png"
               alt="MixerAI 2.0 Logo"
               width={250}
               height={58}
-              priority 
+              priority
             />
           </Link>
         </div>

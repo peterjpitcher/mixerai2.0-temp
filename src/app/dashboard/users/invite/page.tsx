@@ -66,7 +66,7 @@ export default function InviteUserPage() {
       setIsLoadingUserSession(true);
       setUserSessionError(null);
       try {
-        const response = await fetch('/api/me');
+        const response = await apiFetch('/api/me');
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -110,7 +110,7 @@ export default function InviteUserPage() {
     const fetchBrands = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/brands?limit=all');
+        const response = await apiFetch('/api/brands?limit=all');
         const data = await response.json();
         
         if (data.success) {

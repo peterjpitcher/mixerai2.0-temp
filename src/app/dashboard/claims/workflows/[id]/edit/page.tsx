@@ -112,7 +112,7 @@ export default function EditClaimsWorkflowPage() {
   const fetchWorkflow = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/claims/workflows/${workflowId}`);
+      const response = await apiFetch(`/api/claims/workflows/${workflowId}`);
       const data = await response.json();
       
       if (data.success && data.data) {
@@ -161,7 +161,7 @@ export default function EditClaimsWorkflowPage() {
       setUserSearchLoading(prev => ({ ...prev, [stepIndex]: true }));
       
       try {
-        const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
+        const response = await apiFetch(`/api/users/search?query=${encodeURIComponent(query)}`);
         
         if (!response.ok) {
           console.error('User search failed with status:', response.status);

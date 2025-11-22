@@ -10,6 +10,7 @@ import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { generateContentTitleFromContext } from '@/lib/azure/openai';
 // import { TablesInsert, Enums } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 import { User } from '@supabase/supabase-js';
+import { sendNotificationEmail } from '@/lib/notifications/send-notification-email';
 
 // Define the specific type for content status using Enums if available, or define manually
 type ContentStatus = 'draft' | 'pending_review' | 'approved' | 'published' | 'rejected' | 'cancelled'; // TODO: Use Enums<"content_status"> when types are regenerated
@@ -468,37 +469,20 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
             if (newTask) {
               // Send email notification using the email API endpoint
               try {
-                // Get the absolute URL for the API
-                const protocol = request.headers.get('x-forwarded-proto') || 'https';
-                const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
-                const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-                
                 console.log('[Email Notification] Attempting to send to user:', assigneeId);
                 console.log('[Email Notification] Task ID:', newTask.id);
                 console.log('[Email Notification] Content ID:', newContentData.id);
                 
-                const emailResponse = await fetch(`${baseUrl}/api/notifications/email`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    // Forward the authorization header for the email API
-                    'Authorization': request.headers.get('authorization') || '',
-                    // Forward CSRF token if present
-                    'x-csrf-token': request.headers.get('x-csrf-token') || '',
-                    'Cookie': request.headers.get('cookie') || ''
-                  },
-                  body: JSON.stringify({
-                    type: 'task_assignment',
-                    userId: assigneeId,
-                    taskId: newTask.id,
-                    contentId: newContentData.id
-                  })
+                const emailResponse = await sendNotificationEmail({
+                  type: 'task_assignment',
+                  userId: assigneeId,
+                  taskId: newTask.id,
+                  contentId: newContentData.id,
+                  requestUser: user, // Pass the requestUser for context if needed inside the utility
                 });
                 
-                if (!emailResponse.ok) {
-                  const errorText = await emailResponse.text();
-                  console.error('[Email Notification] Failed with status:', emailResponse.status);
-                  console.error('[Email Notification] Error response:', errorText);
+                if (!emailResponse.success) {
+                  console.error('[Email Notification] Failed to send email:', emailResponse.message);
                 } else {
                   console.log('[Email Notification] Successfully queued for user:', assigneeId);
                 }

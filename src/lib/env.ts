@@ -66,7 +66,7 @@ function validateEnv(env: ServerEnv) {
   if (missingVars.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missingVars.join(', ')}\n` +
-        'Please check your .env file or Vercel environment settings.'
+      'Please check your .env file or Vercel environment settings.'
     );
   }
 }
@@ -93,3 +93,24 @@ export function getOptionalEnv(key: keyof OptionalEnvKeys): string | undefined {
   const env = getServerEnv();
   return env[key];
 }
+
+/**
+ * Get environment mode (development, production, test)
+ */
+export const isProduction = (): boolean => {
+  const deploymentEnv = process.env.NEXT_PUBLIC_VERCEL_ENV?.toLowerCase();
+  if (deploymentEnv === 'production') {
+    return true;
+  }
+
+  const nodeEnv = process.env.NODE_ENV?.toLowerCase();
+  return nodeEnv === 'production';
+};
+
+/**
+ * Check if running during build phase (for static site generation)
+ */
+export const isBuildPhase = (): boolean => {
+  const phase = process.env.NEXT_PHASE?.toLowerCase();
+  return phase === 'phase-production-build' || phase === 'phase-export';
+};

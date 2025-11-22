@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -44,7 +44,7 @@ export function BrandDisplay({
   };
 
   const content = (
-    <div 
+    <div
       className={cn(
         'flex items-center',
         sizeClasses[size],
@@ -59,7 +59,7 @@ export function BrandDisplay({
         logoUrl={brand.logo_url || undefined}
         size={size}
       />
-      
+
       {variant === 'compact' ? null : (
         <div className={cn('flex', variant === 'inline' ? 'items-center gap-2' : 'flex-col')}>
           <span className={cn(
@@ -68,7 +68,7 @@ export function BrandDisplay({
           )}>
             {brand.name}
           </span>
-          
+
           {variant === 'detailed' && showMetadata && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               {brand.country && (
@@ -118,8 +118,8 @@ export function BrandDisplay({
 /**
  * Brand display specifically for lists and tables
  */
-export function BrandCell({ brand, onClick }: { 
-  brand: BrandDisplayProps['brand']; 
+export function BrandCell({ brand, onClick }: {
+  brand: BrandDisplayProps['brand'];
   onClick?: () => void;
 }) {
   return (

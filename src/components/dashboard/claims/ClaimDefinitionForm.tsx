@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2 } from 'lucide-react';
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
+import { apiFetch } from '@/lib/api-client';
 
 // Static data for countries - will be mapped to ComboboxOption format
 // This will be replaced by a state variable populated from API
@@ -106,7 +107,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
   useEffect(() => {
     const fetchData = async (url: string, setter: React.Dispatch<React.SetStateAction<ComboboxOption[]>>, entityName: string) => {
       try {
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         if (!response.ok) throw new Error(`Failed to fetch ${entityName}`);
         const apiResponse = await response.json();
         let sourceArray: Entity[] = [];
@@ -134,7 +135,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
     async function fetchClaimsWorkflows() {
       setIsLoadingWorkflows(true);
       try {
-        const response = await fetch('/api/claims/workflows');
+        const response = await apiFetch('/api/claims/workflows');
         if (!response.ok) throw new Error('Failed to fetch claims workflows');
         const apiResponse = await response.json();
         if (apiResponse.success && Array.isArray(apiResponse.data)) {
@@ -160,7 +161,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
     async function fetchCountries() {
       setIsLoadingCountries(true);
       try {
-        const response = await fetch('/api/countries');
+        const response = await apiFetch('/api/countries');
         if (!response.ok) throw new Error('Failed to fetch countries');
         const apiResponse = await response.json();
         if (apiResponse.success && Array.isArray(apiResponse.countries || apiResponse.data)) {

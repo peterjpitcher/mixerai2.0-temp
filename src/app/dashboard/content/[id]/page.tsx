@@ -17,16 +17,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MarkdownDisplay } from '@/components/content/markdown-display';
-import { FaqAccordionDisplay } from '@/components/content/faq-field';
-import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
-import { VettingAgencyFeedbackCard } from '@/components/content/vetting-agency-feedback-card';
+import { MarkdownDisplay } from '@/components/features/content/markdown-display';
+import { FaqAccordionDisplay } from '@/components/features/content/faq-field';
+import { ContentApprovalWorkflow, WorkflowStep } from '@/components/features/content/content-approval-workflow';
+import { VettingAgencyFeedbackCard } from '@/components/features/content/vetting-agency-feedback-card';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandIcon,  } from '@/components/brand-icon';
+import { BrandIcon, } from '@/components/features/brands/brand-icon';
 import { ArrowLeft, Edit3, CheckCircle, Trash2 } from 'lucide-react';
-import { RestartWorkflowButton } from '@/components/content/restart-workflow-button';
-import { RejectionFeedbackCard } from '@/components/content/rejection-feedback-card';
+import { RestartWorkflowButton } from '@/components/features/content/restart-workflow-button';
+import { RejectionFeedbackCard } from '@/components/features/content/rejection-feedback-card';
 import { format as formatDateFns } from 'date-fns';
 import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import type { NormalizedContent } from '@/types/template';
@@ -403,7 +403,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
       </div>
     );
   }
-  
+
   if (!content) {
     return (
       <div className="space-y-6">
@@ -512,183 +512,183 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               {brandIcon ? (
-              <Image src={brandIcon} alt={`${brandName} logo`} width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
-            ) : (
-              <BrandIcon name={brandName} color={brandColor} size="md" />
-            )}
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">{content.title || 'Content Details'}</h1>
-              <p className="mt-1 text-muted-foreground">
-                View details, content body, SEO metadata, and manage the approval workflow.
-                <br />
-                Template: {template?.name || content.template_name || 'N/A'} | Brand: {brandName} | Created: {getFormattedDate(content.created_at)}
-              </p>
+                <Image src={brandIcon} alt={`${brandName} logo`} width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
+              ) : (
+                <BrandIcon name={brandName} color={brandColor} size="md" />
+              )}
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">{content.title || 'Content Details'}</h1>
+                <p className="mt-1 text-muted-foreground">
+                  View details, content body, SEO metadata, and manage the approval workflow.
+                  <br />
+                  Template: {template?.name || content.template_name || 'N/A'} | Brand: {brandName} | Created: {getFormattedDate(content.created_at)}
+                </p>
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              {content.status === 'rejected' ? (
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button asChild variant="default">
+                    <Link href={`${pathname}/edit`}>
+                      <Edit3 className="mr-2 h-4 w-4" /> Edit Content
+                    </Link>
+                  </Button>
+                  <RestartWorkflowButton
+                    contentId={content.id}
+                    contentTitle={content.title}
+                    onRestart={refreshContentData}
+                    variant="outline"
+                  />
+                  {deleteButton}
+                </div>
+              ) : content.status !== 'approved' && content.status !== 'published' ? (
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button asChild variant="default">
+                    <Link href={`${pathname}/edit`}>
+                      <Edit3 className="mr-2 h-4 w-4" /> Edit Content
+                    </Link>
+                  </Button>
+                  {deleteButton}
+                </div>
+              ) : (
+                <div className="flex flex-col items-end gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span>Content is {content.status}</span>
+                  </div>
+                  {deleteButton}
+                </div>
+              )}
             </div>
           </div>
-          <div className="flex-shrink-0">
-            {content.status === 'rejected' ? (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button asChild variant="default">
-                  <Link href={`${pathname}/edit`}>
-                    <Edit3 className="mr-2 h-4 w-4" /> Edit Content
-                  </Link>
-                </Button>
-                <RestartWorkflowButton
-                  contentId={content.id}
-                  contentTitle={content.title}
-                  onRestart={refreshContentData}
-                  variant="outline"
-                />
-                {deleteButton}
-              </div>
-            ) : content.status !== 'approved' && content.status !== 'published' ? (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button asChild variant="default">
-                  <Link href={`${pathname}/edit`}>
-                    <Edit3 className="mr-2 h-4 w-4" /> Edit Content
-                  </Link>
-                </Button>
-                {deleteButton}
-              </div>
-            ) : (
-              <div className="flex flex-col items-end gap-2 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span>Content is {content.status}</span>
-                </div>
-                {deleteButton}
-              </div>
-            )}
-          </div>
         </div>
-      </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:gap-6">
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden lg:pr-3">
-          <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
-            {content.status === 'rejected' && (() => {
-              const rejectionVersion = versions
-                .slice()
-                .reverse()
-                .find(v => v.action_status === 'rejected' && v.feedback);
+        <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:gap-6">
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden lg:pr-3">
+            <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
+              {content.status === 'rejected' && (() => {
+                const rejectionVersion = versions
+                  .slice()
+                  .reverse()
+                  .find(v => v.action_status === 'rejected' && v.feedback);
 
-              return rejectionVersion ? (
-                <RejectionFeedbackCard
-                  feedback={rejectionVersion.feedback}
-                  reviewerName={rejectionVersion.reviewer?.full_name}
-                  rejectedAt={rejectionVersion.created_at}
-                />
-              ) : null;
-            })()}
+                return rejectionVersion ? (
+                  <RejectionFeedbackCard
+                    feedback={rejectionVersion.feedback}
+                    reviewerName={rejectionVersion.reviewer?.full_name}
+                    rejectedAt={rejectionVersion.created_at}
+                  />
+                ) : null;
+              })()}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Current Topic: {currentStepObject?.name || `Review Step ${content.current_step || 1}`}</CardTitle>
-                <CardDescription>
-                  {currentStepObject?.description || 'Review the content below and take appropriate action.'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 ? (
-                  template.fields.outputFields.map(field => {
-                    const normalized = generatedOutputs[field.id];
-                    const normalizedType = field.type?.toLowerCase();
-                    const isPlainTextField = normalizedType === 'plaintext';
-                    const isFaqField = normalizedType === 'faq';
-                    const plainTextContent = normalized?.plain?.trim() ?? '';
-                    const htmlContent = normalized?.html?.trim();
-                    const emptyPlainText = (
-                      <span className="text-muted-foreground italic">No content provided for this field.</span>
-                    );
-
-                    return (
-                      <div key={field.id} className="mb-6" data-field-container-id={field.id}>
-                        <h3 className="mb-2 text-lg font-semibold">{field.name}</h3>
-                        {isFaqField ? (
-                          <FaqAccordionDisplay
-                            content={normalized}
-                            collapseMode={
-                              ((field as { options?: { defaultCollapseMode?: string } }).options?.defaultCollapseMode ===
-                                'single'
-                                ? 'single'
-                                : 'multiple') as 'single' | 'multiple'
-                            }
-                            startCollapsed={
-                              ((field as { options?: { startCollapsed?: boolean } }).options?.startCollapsed ?? true)
-                            }
-                          />
-                        ) : isPlainTextField ? (
-                          <div
-                            data-field-id={field.id}
-                            className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground shadow-xs whitespace-pre-wrap"
-                          >
-                            {plainTextContent ? plainTextContent : emptyPlainText}
-                          </div>
-                        ) : (
-                          <div
-                            data-field-id={field.id}
-                            className="prose prose-sm max-w-none rounded-md border bg-gray-50/50 p-4 dark:bg-gray-800/50"
-                            dangerouslySetInnerHTML={{
-                              __html:
-                                htmlContent && htmlContent.length > 0
-                                  ? htmlContent
-                                  : '<p class="text-muted-foreground italic">This field has no content yet.</p>',
-                            }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="prose prose-sm max-w-none rounded-md border bg-gray-50/50 p-4 dark:bg-gray-800/50">
-                    <MarkdownDisplay markdown={content.body || 'No dynamic fields configured or template not loaded. Showing primary content body.'} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-          </div>
-        </section>
-
-        <aside className="flex min-h-0 flex-col overflow-hidden lg:w-[360px] lg:shrink-0 lg:pl-1">
-          <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
-            {content.workflow_id && currentUserId ? (
-              <>
-                <VettingAgencyFeedbackCard
-                  contentId={content.id}
-                  brandName={brandName}
-                  agencies={selectedVettingAgencies}
-                  outputFieldLabels={outputFieldIdToNameMap}
-                  stageId={currentStageId}
-                  stageName={currentStepObject?.name || null}
-                  existingFeedback={currentStageFeedback}
-                  onFeedbackUpdated={(_result) => refreshContentData()}
-                  autoRun
-                />
-
-                <ContentApprovalWorkflow
-                  contentId={content.id}
-                  contentTitle={content.title}
-                  currentStepObject={currentStepObject}
-                  isCurrentUserStepOwner={isCurrentUserStepOwner}
-                  versions={versions}
-                  template={template}
-                  onActionComplete={refreshContentData}
-                  initialPublishedUrl={content.published_url ?? null}
-                  workflowSteps={content.workflow?.steps}
-                />
-              </>
-            ) : (
               <Card>
+                <CardHeader>
+                  <CardTitle>Current Topic: {currentStepObject?.name || `Review Step ${content.current_step || 1}`}</CardTitle>
+                  <CardDescription>
+                    {currentStepObject?.description || 'Review the content below and take appropriate action.'}
+                  </CardDescription>
+                </CardHeader>
                 <CardContent>
-                  <p className="py-4 text-sm text-muted-foreground">No workflow is associated with this content.</p>
+                  {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 ? (
+                    template.fields.outputFields.map(field => {
+                      const normalized = generatedOutputs[field.id];
+                      const normalizedType = field.type?.toLowerCase();
+                      const isPlainTextField = normalizedType === 'plaintext';
+                      const isFaqField = normalizedType === 'faq';
+                      const plainTextContent = normalized?.plain?.trim() ?? '';
+                      const htmlContent = normalized?.html?.trim();
+                      const emptyPlainText = (
+                        <span className="text-muted-foreground italic">No content provided for this field.</span>
+                      );
+
+                      return (
+                        <div key={field.id} className="mb-6" data-field-container-id={field.id}>
+                          <h3 className="mb-2 text-lg font-semibold">{field.name}</h3>
+                          {isFaqField ? (
+                            <FaqAccordionDisplay
+                              content={normalized}
+                              collapseMode={
+                                ((field as { options?: { defaultCollapseMode?: string } }).options?.defaultCollapseMode ===
+                                  'single'
+                                  ? 'single'
+                                  : 'multiple') as 'single' | 'multiple'
+                              }
+                              startCollapsed={
+                                ((field as { options?: { startCollapsed?: boolean } }).options?.startCollapsed ?? true)
+                              }
+                            />
+                          ) : isPlainTextField ? (
+                            <div
+                              data-field-id={field.id}
+                              className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground shadow-xs whitespace-pre-wrap"
+                            >
+                              {plainTextContent ? plainTextContent : emptyPlainText}
+                            </div>
+                          ) : (
+                            <div
+                              data-field-id={field.id}
+                              className="prose prose-sm max-w-none rounded-md border bg-gray-50/50 p-4 dark:bg-gray-800/50"
+                              dangerouslySetInnerHTML={{
+                                __html:
+                                  htmlContent && htmlContent.length > 0
+                                    ? htmlContent
+                                    : '<p class="text-muted-foreground italic">This field has no content yet.</p>',
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="prose prose-sm max-w-none rounded-md border bg-gray-50/50 p-4 dark:bg-gray-800/50">
+                      <MarkdownDisplay markdown={content.body || 'No dynamic fields configured or template not loaded. Showing primary content body.'} />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
-          </div>
-        </aside>
+
+            </div>
+          </section>
+
+          <aside className="flex min-h-0 flex-col overflow-hidden lg:w-[360px] lg:shrink-0 lg:pl-1">
+            <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
+              {content.workflow_id && currentUserId ? (
+                <>
+                  <VettingAgencyFeedbackCard
+                    contentId={content.id}
+                    brandName={brandName}
+                    agencies={selectedVettingAgencies}
+                    outputFieldLabels={outputFieldIdToNameMap}
+                    stageId={currentStageId}
+                    stageName={currentStepObject?.name || null}
+                    existingFeedback={currentStageFeedback}
+                    onFeedbackUpdated={(_result) => refreshContentData()}
+                    autoRun
+                  />
+
+                  <ContentApprovalWorkflow
+                    contentId={content.id}
+                    contentTitle={content.title}
+                    currentStepObject={currentStepObject}
+                    isCurrentUserStepOwner={isCurrentUserStepOwner}
+                    versions={versions}
+                    template={template}
+                    onActionComplete={refreshContentData}
+                    initialPublishedUrl={content.published_url ?? null}
+                    workflowSteps={content.workflow?.steps}
+                  />
+                </>
+              ) : (
+                <Card>
+                  <CardContent>
+                    <p className="py-4 text-sm text-muted-foreground">No workflow is associated with this content.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </aside>
+        </div>
       </div>
-    </div>
       <AlertDialog open={showDeleteDialog} onOpenChange={handleDialogOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>

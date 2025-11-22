@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { TemplateForm } from '@/components/template/template-form';
+import { TemplateForm } from '@/components/features/templates/template-form';
 import { Loader2, ArrowLeft, Trash2, ShieldAlert, AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
@@ -312,7 +312,7 @@ export default function TemplateEditPage() {
       </div>
     );
   }
-  
+
   if (!template && !loading) { // If not loading and template is still null (e.g. API error, not found)
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
@@ -328,18 +328,18 @@ export default function TemplateEditPage() {
 
   const handleOpenDeleteDialog = () => {
     if (!canEditTemplate || isSystemTemplate) {
-        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
-        return;
+      toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
+      return;
     }
     setShowDeleteDialog(true);
   };
 
   const handleConfirmDelete = async () => {
     if (!canEditTemplate || isSystemTemplate) {
-        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
-        setIsDeleting(false);
-        setShowDeleteDialog(false);
-        return;
+      toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      return;
     }
     if (!template || isSystemTemplateId(String(template.id))) {
       toast.error('System templates cannot be deleted.');
@@ -366,16 +366,16 @@ export default function TemplateEditPage() {
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        { label: "Content Templates", href: "/dashboard/templates" }, 
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Content Templates", href: "/dashboard/templates" },
         { label: String(template?.name || id) }
       ]} />
-      
+
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => router.push('/dashboard/templates')}
             aria-label="Back to Templates"
           >
@@ -398,8 +398,8 @@ export default function TemplateEditPage() {
       </div>
 
       {/* Pass isReadOnly prop to TemplateForm based on user permissions or view mode */}
-      <TemplateForm 
-        initialData={template as unknown as ContentTemplate | undefined} 
+      <TemplateForm
+        initialData={template as unknown as ContentTemplate | undefined}
         isReadOnly={!canEditTemplate || !!isSystemTemplate || isViewMode}
       />
 

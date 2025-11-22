@@ -60,7 +60,7 @@ export default function IngredientsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/ingredients');
+        const response = await apiFetch('/api/ingredients');
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || 'Failed to fetch ingredients');

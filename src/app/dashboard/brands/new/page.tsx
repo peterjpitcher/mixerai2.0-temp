@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MultiSelectCheckboxCombobox } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle, AlertTriangle, Sparkles } from 'lucide-react';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES, getLanguagesForCountry, getLanguageLabel } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -102,13 +102,13 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
 
 export default function NewBrandPage() {
   const router = useRouter();
-  
+
   // State definitions
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingAgencies, setIsGeneratingAgencies] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); 
+  const [isLoading, setIsLoading] = useState(false);
 
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -438,7 +438,7 @@ export default function NewBrandPage() {
   const handleAdditionalUrlChange = (id: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      additional_website_urls: prev.additional_website_urls.map(urlObj => 
+      additional_website_urls: prev.additional_website_urls.map(urlObj =>
         urlObj.id === id ? { ...urlObj, value } : urlObj
       )
     }));
@@ -465,8 +465,8 @@ export default function NewBrandPage() {
       return;
     }
     if (!canGenerateIdentity) {
-       toast.error('Please enter at least one website URL (main or additional) to generate identity.');
-       return;
+      toast.error('Please enter at least one website URL (main or additional) to generate identity.');
+      return;
     }
     const rawUrls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)]
       .map(url => (url || '').trim())
@@ -632,8 +632,8 @@ export default function NewBrandPage() {
 
       const suggestionIds: string[] = Array.isArray(payload.data?.suggestions)
         ? payload.data.suggestions
-            .map((entry: { record?: { id?: string } }) => entry?.record?.id)
-            .filter((id: unknown): id is string => typeof id === 'string')
+          .map((entry: { record?: { id?: string } }) => entry?.record?.id)
+          .filter((id: unknown): id is string => typeof id === 'string')
         : [];
 
       if (suggestionIds.length > 0) {
@@ -664,11 +664,11 @@ export default function NewBrandPage() {
           country_code: record.countryCode
             ? String(record.countryCode).toUpperCase()
             : record.country_code
-            ? String(record.country_code).toUpperCase()
-            : null,
+              ? String(record.country_code).toUpperCase()
+              : null,
           priority: mapNumericPriorityToLabel(
             (record.priority as number | string | null | undefined) ??
-              (record.priorityLabel as string | null | undefined),
+            (record.priorityLabel as string | null | undefined),
           ),
         }))
         .filter((agency) => agency.id && agency.name);
@@ -757,7 +757,7 @@ export default function NewBrandPage() {
         ...restFormData
       } = formData;
 
-      const payload: Record<string, unknown> = { 
+      const payload: Record<string, unknown> = {
         ...restFormData,
         website_url: normalizedWebsiteUrl,
         additional_website_urls: normalizedAdditionalUrls,
@@ -767,7 +767,7 @@ export default function NewBrandPage() {
       payload.content_vetting_agencies = uuidValidAgencyIds;
 
       Object.keys(payload).forEach(key => {
-        if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0) ) {
+        if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0)) {
           payload[key] = null;
         }
       });
@@ -785,7 +785,7 @@ export default function NewBrandPage() {
         throw new Error(data.error || 'Failed to create brand');
       }
       toast.success('Brand created successfully!');
-      
+
       router.push('/dashboard/brands');
     } catch (error) {
       toast.error((error as Error).message || 'Failed to create brand.');
@@ -798,35 +798,35 @@ export default function NewBrandPage() {
   const languageName = formData.language ? getLanguageLabel(formData.language) : 'Select language';
   const languagesForCountry = getLanguagesForCountry(formData.country);
   const availableLanguageOptions = languagesForCountry.length ? languagesForCountry : LANGUAGES;
-  
+
   return (
     <div className="space-y-6">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Brands", href: "/dashboard/brands" }, { label: "Create New Brand" }]} />
-       <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/brands')} aria-label="Back to Brands">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <BrandIcon 
-            name={formData.name || "New Brand"} 
-            color={formData.brand_color} 
+          <BrandIcon
+            name={formData.name || "New Brand"}
+            color={formData.brand_color}
             logoUrl={formData.logo_url}
-            size="lg" 
+            size="lg"
           />
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Create New Brand</h1>
             <p className="text-muted-foreground">Define the details for your new brand.</p>
           </div>
         </div>
-        <Link 
-          href="/dashboard/help#brands" 
+        <Link
+          href="/dashboard/help#brands"
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
           Need help?
         </Link>
-       </div>
-       
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="basic">Basic Details</TabsTrigger>
@@ -840,13 +840,13 @@ export default function NewBrandPage() {
               <div className="grid grid-cols-12 gap-4 items-center">
                 <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right">Brand Name <span className="text-destructive">*</span></Label>
                 <div className="col-span-12 sm:col-span-9">
-                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required/>
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required />
                 </div>
               </div>
               <div className="grid grid-cols-12 gap-4 items-center">
                 <Label htmlFor="website_url" className="col-span-12 sm:col-span-3 text-left sm:text-right">Main Website URL</Label>
                 <div className="col-span-12 sm:col-span-9">
-                  <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url"/>
+                  <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url" />
                 </div>
               </div>
               <div className="grid grid-cols-12 gap-4 items-center">
@@ -896,10 +896,10 @@ export default function NewBrandPage() {
             </CardContent>
             <CardFooter className="flex justify-end space-x-2 border-t pt-6">
               <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
-                  Cancel
+                Cancel
               </Button>
               <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
-                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
+                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
               </Button>
             </CardFooter>
           </Card>
@@ -943,93 +943,116 @@ export default function NewBrandPage() {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <div className="grid grid-cols-12 gap-4">
                       <Label htmlFor="brand_identity" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Brand Identity</Label>
                       <div className="col-span-12 sm:col-span-9">
-                        <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/>
+                        <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6} />
                       </div>
                     </div>
                     <div className="grid grid-cols-12 gap-4">
                       <Label htmlFor="tone_of_voice" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Tone of Voice</Label>
                       <div className="col-span-12 sm:col-span-9">
-                        <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/>
+                        <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4} />
                       </div>
                     </div>
                     <div className="grid grid-cols-12 gap-4">
                       <Label htmlFor="guardrails" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Content Guardrails</Label>
                       <div className="col-span-12 sm:col-span-9">
-                        <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/>
+                        <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4} />
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-12 gap-4">
                       <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Content Vetting<br />Agencies</Label>
                       <div className="col-span-12 sm:col-span-9">
                         {isLoading && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
-                        
+
                         {(() => { // IIFE to manage filteredAgencies
-                        const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country);
+                          const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country);
 
-                        const renderGenerationCta = (message: string) => (
-                          <div className="space-y-3">
-                            <p className="text-sm text-muted-foreground">{message}</p>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              onClick={handleGenerateAgencies}
-                              disabled={isGeneratingAgencies || !canGenerateAgencyRecommendations}
-                              className="inline-flex items-center"
-                            >
-                              {isGeneratingAgencies ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Generating…
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="mr-2 h-4 w-4" />
-                                  Generate vetting agencies
-                                </>
+                          const renderGenerationCta = (message: string) => (
+                            <div className="space-y-3">
+                              <p className="text-sm text-muted-foreground">{message}</p>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={handleGenerateAgencies}
+                                disabled={isGeneratingAgencies || !canGenerateAgencyRecommendations}
+                                className="inline-flex items-center"
+                              >
+                                {isGeneratingAgencies ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Generating…
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="mr-2 h-4 w-4" />
+                                    Generate vetting agencies
+                                  </>
+                                )}
+                              </Button>
+                              {!canGenerateAgencyRecommendations && (
+                                <p className="text-xs text-muted-foreground">
+                                  Add a brand name and country to enable AI-generated recommendations.
+                                </p>
                               )}
-                            </Button>
-                            {!canGenerateAgencyRecommendations && (
-                              <p className="text-xs text-muted-foreground">
-                                Add a brand name and country to enable AI-generated recommendations.
-                              </p>
-                            )}
-                          </div>
-                        );
-
-                        if (!isLoading && !formData.country && allVettingAgencies.length > 0) {
-                          return (
-                            <p className="text-sm text-muted-foreground">
-                              Select a country to see relevant vetting agencies. Showing all available agencies.
-                            </p>
+                            </div>
                           );
-                        }
 
-                        if (!isLoading && formData.country && filteredAgenciesByIdentityTab.length === 0) {
-                          return renderGenerationCta(`No specific vetting agencies found for ${COUNTRIES.find(c => c.value === formData.country)?.label || formData.country}.`);
-                        }
+                          if (!isLoading && !formData.country && allVettingAgencies.length > 0) {
+                            return (
+                              <p className="text-sm text-muted-foreground">
+                                Select a country to see relevant vetting agencies. Showing all available agencies.
+                              </p>
+                            );
+                          }
 
-                        if (!isLoading && allVettingAgencies.length === 0) {
-                           return renderGenerationCta('No vetting agencies found in the system. Generate suggestions to seed the catalogue.');
-                        }
-                        
-                        // Render agency groups only if there are agencies to show (either all or filtered)
-                        if (!isLoading && (allVettingAgencies.length > 0 && (!formData.country || filteredAgenciesByIdentityTab.length > 0))) {
-                          return (
-                            <>
-                              {priorityOrder.map(priorityLevel => {
-                                const agenciesInGroup = filteredAgenciesByIdentityTab.filter(agency => agency.priority === priorityLevel);
-                                if (agenciesInGroup.length === 0) return null;
-                                return (
-                                  <div key={priorityLevel} className="mt-3">
-                                    <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(priorityLevel)}`}>{priorityLevel} Priority</h4>
+                          if (!isLoading && formData.country && filteredAgenciesByIdentityTab.length === 0) {
+                            return renderGenerationCta(`No specific vetting agencies found for ${COUNTRIES.find(c => c.value === formData.country)?.label || formData.country}.`);
+                          }
+
+                          if (!isLoading && allVettingAgencies.length === 0) {
+                            return renderGenerationCta('No vetting agencies found in the system. Generate suggestions to seed the catalogue.');
+                          }
+
+                          // Render agency groups only if there are agencies to show (either all or filtered)
+                          if (!isLoading && (allVettingAgencies.length > 0 && (!formData.country || filteredAgenciesByIdentityTab.length > 0))) {
+                            return (
+                              <>
+                                {priorityOrder.map(priorityLevel => {
+                                  const agenciesInGroup = filteredAgenciesByIdentityTab.filter(agency => agency.priority === priorityLevel);
+                                  if (agenciesInGroup.length === 0) return null;
+                                  return (
+                                    <div key={priorityLevel} className="mt-3">
+                                      <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(priorityLevel)}`}>{priorityLevel} Priority</h4>
+                                      <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                                        {agenciesInGroup.map(agency => (
+                                          <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                            <Checkbox
+                                              id={`new-agency-${agency.id}`}
+                                              checked={formData.content_vetting_agencies.includes(agency.id)}
+                                              onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                            />
+                                            <Label
+                                              htmlFor={`new-agency-${agency.id}`}
+                                              className={getPriorityAgencyStyles(agency.priority)}
+                                            >
+                                              {agency.name}
+                                            </Label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).length > 0 && (
+                                  <div key="other-priority" className="mt-3">
+                                    <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
                                     <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                                      {agenciesInGroup.map(agency => (
+                                      {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).map(agency => (
                                         <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
                                           <Checkbox
                                             id={`new-agency-${agency.id}`}
@@ -1046,57 +1069,34 @@ export default function NewBrandPage() {
                                       ))}
                                     </div>
                                   </div>
-                                );
-                              })}
-                              {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).length > 0 && (
-                                <div key="other-priority" className="mt-3">
-                                  <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
-                                  <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                                    {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).map(agency => (
-                                      <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                        <Checkbox
-                                          id={`new-agency-${agency.id}`}
-                                          checked={formData.content_vetting_agencies.includes(agency.id)}
-                                          onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                        />
-                                        <Label
-                                          htmlFor={`new-agency-${agency.id}`}
-                                          className={getPriorityAgencyStyles(agency.priority)}
-                                        >
-                                          {agency.name}
-                                        </Label>
-                                      </div>
-                                    ))}
+                                )}
+                                {filteredAgenciesByIdentityTab.filter(a => a.priority == null).length > 0 && (
+                                  <div key="no-priority" className="mt-3">
+                                    <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Uncategorised</h4>
+                                    <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                                      {filteredAgenciesByIdentityTab.filter(a => a.priority == null).map(agency => (
+                                        <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                          <Checkbox
+                                            id={`new-agency-${agency.id}`}
+                                            checked={formData.content_vetting_agencies.includes(agency.id)}
+                                            onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                          />
+                                          <Label
+                                            htmlFor={`new-agency-${agency.id}`}
+                                            className={getPriorityAgencyStyles(agency.priority)}
+                                          >
+                                            {agency.name}
+                                          </Label>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {filteredAgenciesByIdentityTab.filter(a => a.priority == null).length > 0 && (
-                                <div key="no-priority" className="mt-3">
-                                  <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Uncategorised</h4>
-                                  <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                                    {filteredAgenciesByIdentityTab.filter(a => a.priority == null).map(agency => (
-                                      <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                        <Checkbox
-                                          id={`new-agency-${agency.id}`}
-                                          checked={formData.content_vetting_agencies.includes(agency.id)}
-                                          onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                        />
-                                        <Label
-                                          htmlFor={`new-agency-${agency.id}`}
-                                          className={getPriorityAgencyStyles(agency.priority)}
-                                        >
-                                          {agency.name}
-                                        </Label>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          );
-                        }
-                        return null; // Fallback if no conditions met to render agencies
-                      })()}
+                                )}
+                              </>
+                            );
+                          }
+                          return null; // Fallback if no conditions met to render agencies
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1106,8 +1106,8 @@ export default function NewBrandPage() {
                     <div className="space-y-2">
                       <Label className="font-semibold">Quick Preview</Label>
                       <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
-                        <BrandIcon 
-                          name={formData.name || 'Brand Name'} 
+                        <BrandIcon
+                          name={formData.name || 'Brand Name'}
                           color={formData.brand_color ?? undefined}
                           logoUrl={formData.logo_url}
                         />
@@ -1126,39 +1126,39 @@ export default function NewBrandPage() {
                     <div className="space-y-2">
                       <Label htmlFor="brand_color_identity_tab">Brand Colour</Label>
                       <div className="flex gap-2 items-center">
-                        <input 
-                            type="color" 
-                            id="brand_color_identity_tab"
-                            name="brand_color" 
-                            value={formData.brand_color} 
-                            onChange={handleInputChange} 
-                            className="w-10 h-10 rounded cursor-pointer border"
+                        <input
+                          type="color"
+                          id="brand_color_identity_tab"
+                          name="brand_color"
+                          value={formData.brand_color}
+                          onChange={handleInputChange}
+                          className="w-10 h-10 rounded cursor-pointer border"
                         />
-                        <Input 
-                            id="brand_color_hex_identity_tab"
-                            value={formData.brand_color} 
-                            onChange={handleInputChange} 
-                            name="brand_color" 
-                            placeholder="#HEX" 
-                            className="w-32"
+                        <Input
+                          id="brand_color_hex_identity_tab"
+                          value={formData.brand_color}
+                          onChange={handleInputChange}
+                          name="brand_color"
+                          placeholder="#HEX"
+                          className="w-32"
                         />
                       </div>
-                       <div className="w-full h-12 rounded-md mt-2" style={{ backgroundColor: formData.brand_color }} />
-                       <p className="text-xs text-center text-muted-foreground">{formData.brand_color}</p>
+                      <div className="w-full h-12 rounded-md mt-2" style={{ backgroundColor: formData.brand_color }} />
+                      <p className="text-xs text-center text-muted-foreground">{formData.brand_color}</p>
                     </div>
                   </div>
                 </div>
               </div>
-         </CardContent>
-         <CardFooter className="flex justify-end space-x-2 border-t pt-6">
-           <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
-               Cancel
-           </Button>
-           <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
-               {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
-           </Button>
-         </CardFooter>
-       </Card>
+            </CardContent>
+            <CardFooter className="flex justify-end space-x-2 border-t pt-6">
+              <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
+                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
+              </Button>
+            </CardFooter>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

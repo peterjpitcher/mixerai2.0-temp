@@ -18,6 +18,7 @@ import { TableEmptyState } from '@/components/ui/table-empty-state';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useCurrentUser } from '@/hooks/use-common-data';
+import { apiFetch } from '@/lib/api-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,7 +115,7 @@ export default function BrandsPage() {
           limit: String(pageSize),
         });
 
-        const response = await fetch(`/api/brands?${params.toString()}`, { signal });
+        const response = await apiFetch(`/api/brands?${params.toString()}`, { signal });
         if (signal?.aborted) return;
 
         if (!response.ok) {

@@ -11,6 +11,7 @@ import { verifyEmailTemplates } from '@/lib/auth/email-templates';
 import type { Json } from '@/types/supabase';
 import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
+import { generateWorkflowDescription } from '@/lib/ai/generate-workflow-description';
 
 // Define types for workflow steps and assignees
 
@@ -236,30 +237,19 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
         templateNameForDesc = templateData?.name;
       }
       
-      const stepNamesForDesc = stepsForAIDescription.map((step: { name?: string }) => step.name).filter(Boolean);
+      const stepNamesForDesc = stepsForAIDescription.map((step: { name?: string }) => step.name).filter((name): name is string => !!name);
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflowName: body.name,
-          brandName: brandNameForDesc,
-          templateName: templateNameForDesc,
-          stepNames: stepNamesForDesc,
-        }),
+      const generatedDescription = await generateWorkflowDescription({
+        workflowName: body.name,
+        brandName: brandNameForDesc,
+        templateName: templateNameForDesc,
+        stepNames: stepNamesForDesc,
       });
 
-      if (aiDescriptionResponse.ok) {
-        const aiData = await aiDescriptionResponse.json();
-        if (aiData.success && aiData.description) {
-          workflowDescription = aiData.description;
-        } else {
-          console.warn('AI description generation succeeded but no description was returned or success was false.');
-        }
+      if (generatedDescription) {
+        workflowDescription = generatedDescription;
       } else {
-        const errorData = await aiDescriptionResponse.json();
-        console.warn('Failed to generate AI description:', errorData.error || aiDescriptionResponse.statusText);
+        console.warn('AI description generation succeeded but no description was returned or success was false.');
       }
     } catch (aiError) {
       console.warn('Error calling AI description generation service:', aiError);

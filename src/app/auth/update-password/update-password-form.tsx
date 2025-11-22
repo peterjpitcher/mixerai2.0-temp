@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Spinner } from '@/components/spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { CheckCheck, AlertTriangle } from 'lucide-react';
 
 import { createSupabaseClient } from '@/lib/supabase/client';

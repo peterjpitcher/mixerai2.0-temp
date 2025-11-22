@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
-import { Toaster as SonnerToaster } from "@/components/sonner";
-import { ErrorBoundary } from "@/components/error-boundary";
+import RootLayoutWrapper from "@/components/features/layout/root-layout-wrapper";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { AppProviders } from "@/providers/app-providers";
 import { CSRFInitializer } from "@/components/csrf-initializer";
 

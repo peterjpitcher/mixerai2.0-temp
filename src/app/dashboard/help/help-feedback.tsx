@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api-client';
 
 interface HelpArticleFeedbackProps {
   articleSlug: string;
@@ -52,7 +53,7 @@ export function HelpArticleFeedback({ articleSlug, articleTitle }: HelpArticleFe
       };
 
       const csrfToken = getCsrfToken();
-      const response = await fetch('/api/help/feedback', {
+      const response = await apiFetch('/api/help/feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

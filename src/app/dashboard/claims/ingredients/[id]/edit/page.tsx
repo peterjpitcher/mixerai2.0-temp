@@ -73,7 +73,7 @@ export default function EditIngredientPage() {
     setIsLoading(true);
     async function fetchIngredientAndProducts() {
       try {
-        const ingredientResponse = await fetch(`/api/ingredients/${id}`);
+        const ingredientResponse = await apiFetch(`/api/ingredients/${id}`);
         if (!ingredientResponse.ok) {
           const errorData = await ingredientResponse.json().catch(() => ({}));
           if (ingredientResponse.status === 404) {
@@ -92,7 +92,7 @@ export default function EditIngredientPage() {
           throw new Error(ingredientResult.error || "Failed to parse ingredient details.");
         }
 
-        const productsResponse = await fetch(`/api/products?limit=1000`);
+        const productsResponse = await apiFetch('/api/products?limit=1000');
         if (!productsResponse.ok) {
           const errorData = await productsResponse.json().catch(() => ({}));
           throw new Error(errorData.error || "Failed to fetch products.");
@@ -104,7 +104,7 @@ export default function EditIngredientPage() {
           throw new Error(productsResult.error || "Failed to parse products list.");
         }
 
-        const associatedProductsResponse = await fetch(`/api/ingredients/${id}/products`);
+        const associatedProductsResponse = await apiFetch(`/api/ingredients/${id}/products`);
         if (!associatedProductsResponse.ok) {
           const errorData = await associatedProductsResponse.json().catch(() => ({}));
           throw new Error(errorData.error || "Failed to fetch associated products.");

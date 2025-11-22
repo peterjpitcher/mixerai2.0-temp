@@ -8,11 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { 
-  Loader2, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
+import {
+  Loader2,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
   ClipboardList,
   User,
   FileText,
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { format } from 'date-fns';
 import {
   Table,
@@ -61,7 +61,7 @@ interface WorkflowStep {
   step_type: string;
   requires_all_assignees: boolean;
   assignees?: string[];
-  assigned_users?: Array<{id: string; full_name?: string; email?: string}>;
+  assigned_users?: Array<{ id: string; full_name?: string; email?: string }>;
   instructions?: string;
   is_completed?: boolean;
   is_current?: boolean;
@@ -121,9 +121,9 @@ export default function ClaimsPendingApprovalPage() {
   const fetchPendingClaims = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/claims/pending-approval');
+      const response = await apiFetch('/api/claims/pending-approval');
       const data = await response.json();
-      
+
       if (data.success) {
         const items = data.data?.items || [];
         setPendingClaims(items);
@@ -160,9 +160,9 @@ export default function ClaimsPendingApprovalPage() {
   const fetchClaimDetails = async (claimId: string) => {
     setIsLoadingDetails(true);
     try {
-      const response = await fetch(`/api/claims/${claimId}/details`);
+      const response = await apiFetch(`/api/claims/${claimId}/details`);
       const data = await response.json();
-      
+
       if (data.success) {
         setClaimDetails(data.data);
       } else {
@@ -200,7 +200,7 @@ export default function ClaimsPendingApprovalPage() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success(`Claim ${action}d successfully`);
         fetchPendingClaims();
@@ -313,7 +313,7 @@ export default function ClaimsPendingApprovalPage() {
                             onClick={() => setSelectedClaim(claim)}
                           >
                             <TableCell>
-                              <BrandIcon 
+                              <BrandIcon
                                 name={claim.brand_name || 'Unknown'}
                                 color={claim.brand_primary_color}
                                 logoUrl={claim.brand_logo_url}
@@ -358,7 +358,7 @@ export default function ClaimsPendingApprovalPage() {
                   <div className="flex items-start justify-between">
                     <div className="space-y-2 flex-1">
                       <div className="flex items-center gap-3">
-                        <BrandIcon 
+                        <BrandIcon
                           name={selectedClaim.brand_name || 'Unknown'}
                           color={selectedClaim.brand_primary_color}
                           logoUrl={selectedClaim.brand_logo_url}
@@ -462,10 +462,10 @@ export default function ClaimsPendingApprovalPage() {
                               const isPrevious = step.is_completed;
                               const isCurrent = step.is_current;
                               const isNext = !step.is_completed && !step.is_current;
-                              
+
                               // Find history for this step
-                              const stepHistory = claimDetails.history.filter((h) => 
-                                (h as {workflow_step_id?: string}).workflow_step_id === step.id
+                              const stepHistory = claimDetails.history.filter((h) =>
+                                (h as { workflow_step_id?: string }).workflow_step_id === step.id
                               );
 
                               return (
@@ -477,20 +477,20 @@ export default function ClaimsPendingApprovalPage() {
                                       isPrevious || isCurrent ? "bg-primary" : "bg-gray-300"
                                     )} />
                                   )}
-                                  
+
                                   <div
                                     className={cn(
                                       "flex items-start gap-3 p-3 rounded-lg mb-2 border-2 transition-all",
-                                      isCurrent ? "border-primary bg-primary/5 shadow-sm" : 
-                                      isPrevious ? "border-green-500 bg-green-50 dark:bg-green-900/20" : 
-                                      "border-gray-200 bg-gray-50/50 dark:bg-gray-900/20"
+                                      isCurrent ? "border-primary bg-primary/5 shadow-sm" :
+                                        isPrevious ? "border-green-500 bg-green-50 dark:bg-green-900/20" :
+                                          "border-gray-200 bg-gray-50/50 dark:bg-gray-900/20"
                                     )}
                                   >
                                     <div className={cn(
                                       "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium shrink-0",
-                                      isPrevious ? "bg-green-600 text-white" : 
-                                      isCurrent ? "bg-primary text-primary-foreground" : 
-                                      "bg-gray-300 text-gray-600"
+                                      isPrevious ? "bg-green-600 text-white" :
+                                        isCurrent ? "bg-primary text-primary-foreground" :
+                                          "bg-gray-300 text-gray-600"
                                     )}>
                                       {isPrevious ? (
                                         <CheckCircle className="h-5 w-5" />
@@ -498,7 +498,7 @@ export default function ClaimsPendingApprovalPage() {
                                         index + 1
                                       )}
                                     </div>
-                                    
+
                                     <div className="flex-1 space-y-3">
                                       <div className="flex items-center justify-between">
                                         <div>
@@ -525,7 +525,7 @@ export default function ClaimsPendingApprovalPage() {
                                           )}
                                         </div>
                                       </div>
-                                      
+
                                       {/* Assignees */}
                                       <div className="flex items-center gap-2 text-xs">
                                         <User className="h-3 w-3 text-muted-foreground" />
@@ -556,9 +556,9 @@ export default function ClaimsPendingApprovalPage() {
                                                 <div className="flex items-center gap-2">
                                                   <div className={cn(
                                                     "h-5 w-5 rounded-full flex items-center justify-center",
-                                                    history.action_status === 'approved' ? "bg-green-100" : 
-                                                    history.action_status === 'rejected' ? "bg-red-100" : 
-                                                    "bg-gray-100"
+                                                    history.action_status === 'approved' ? "bg-green-100" :
+                                                      history.action_status === 'rejected' ? "bg-red-100" :
+                                                        "bg-gray-100"
                                                   )}>
                                                     {history.action_status === 'approved' ? (
                                                       <CheckCircle className="h-3 w-3 text-green-600" />
@@ -580,7 +580,7 @@ export default function ClaimsPendingApprovalPage() {
                                                   </div>
                                                 </div>
                                               </div>
-                                              
+
                                               {/* Approved/Rejected content if different from current */}
                                               {history.updated_claim_text && history.updated_claim_text !== selectedClaim.claim_text ? (
                                                 <div className="bg-muted/50 rounded p-2 space-y-1">
@@ -591,7 +591,7 @@ export default function ClaimsPendingApprovalPage() {
                                                   <p className="text-xs italic">{history.updated_claim_text as string}</p>
                                                 </div>
                                               ) : null}
-                                              
+
                                               {/* Comment */}
                                               {history.comment ? (
                                                 <div className="bg-muted/50 rounded p-2 space-y-1">
@@ -602,7 +602,7 @@ export default function ClaimsPendingApprovalPage() {
                                                   <p className="text-xs">{history.comment as string}</p>
                                                 </div>
                                               ) : null}
-                                              
+
                                               {/* Feedback (for rejections) */}
                                               {history.feedback ? (
                                                 <div className="bg-red-50 dark:bg-red-900/20 rounded p-2 space-y-1">
@@ -617,7 +617,7 @@ export default function ClaimsPendingApprovalPage() {
                                           ))}
                                         </div>
                                       )}
-                                      
+
                                       {/* Show pending state for future steps */}
                                       {isNext && (
                                         <div className="text-xs text-muted-foreground italic">

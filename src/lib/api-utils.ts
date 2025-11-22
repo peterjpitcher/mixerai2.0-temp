@@ -5,28 +5,13 @@
 import { NextResponse } from 'next/server';
 import { isPostgresError } from '@/types/api';
 import { isRLSError } from '@/lib/api/rls-helpers';
-import { apiFetchJson, ApiClientError } from '@/lib/api-client';
+import { isProduction, isBuildPhase } from '@/lib/env';
 
-/**
- * Get environment mode (development, production, test)
- */
-export const isProduction = (): boolean => {
-  const deploymentEnv = process.env.NEXT_PUBLIC_VERCEL_ENV?.toLowerCase();
-  if (deploymentEnv === 'production') {
-    return true;
-  }
+// Re-export environment helpers
+export { isProduction, isBuildPhase };
 
-  const nodeEnv = process.env.NODE_ENV?.toLowerCase();
-  return nodeEnv === 'production';
-};
-
-/**
- * Check if running during build phase (for static site generation)
- */
-export const isBuildPhase = (): boolean => {
-  const phase = process.env.NEXT_PHASE?.toLowerCase();
-  return phase === 'phase-production-build' || phase === 'phase-export';
-};
+// Re-export client services
+export * from '@/lib/api/client-services';
 
 const NODE_CONNECTION_ERROR_CODES = new Set([
   'ECONNREFUSED',
@@ -67,7 +52,7 @@ const CONNECTION_MESSAGE_PATTERNS: RegExp[] = [
  */
 export const isDatabaseConnectionError = (error: unknown): boolean => {
   if (!error) return false;
-  
+
   if (typeof error === 'object' && error !== null) {
     const code = 'code' in error ? String((error as { code?: unknown }).code) : undefined;
     if (code && (NODE_CONNECTION_ERROR_CODES.has(code) || POSTGRES_CONNECTION_ERROR_CODES.has(code))) {
@@ -133,36 +118,36 @@ export const handleApiError = (
   } else if (typeof error === 'number' || typeof error === 'boolean') {
     errorDetails.message = String(error);
   }
-  
+
   errorDetails.isDatabaseError = isDatabaseConnectionError(error);
-  
+
   // Log the full error in development, but a sanitized version in production
   const logPayload = isProduction() ? errorDetails : error;
   console.error(`[API Error] ${message}`, logPayload);
-  
+
   // During static site generation, we return an empty success
   // to prevent build errors with database connections
   if (isBuildPhase()) {
     console.log('Returning mock data during build phase');
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       isMockData: true,
       data: []
     });
   }
-  
+
   // If this is a database connection error, provide a more helpful response
   if (isDatabaseConnectionError(error)) {
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Database connection error. Please try again later.',
         isFallback: true,
       },
       { status: 503 } // Service Unavailable
     );
   }
-  
+
   // Check for RLS (Row Level Security) errors
   if (isRLSError(error)) {
     console.error('[RLS Policy Violation]', {
@@ -170,10 +155,10 @@ export const handleApiError = (
       errorDetails,
       originalError: error
     });
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'You do not have permission to perform this action.',
         code: 'PERMISSION_DENIED',
         details: isProduction() ? undefined : errorDetails.message
@@ -181,11 +166,11 @@ export const handleApiError = (
       { status: 403 } // Forbidden
     );
   }
-  
+
   // Otherwise return the actual error
   return NextResponse.json(
-    { 
-      success: false, 
+    {
+      success: false,
       error: message,
       details: isProduction() ? 'See server logs for details' : errorDetails.message,
       hint: errorDetails.hint,
@@ -193,77 +178,4 @@ export const handleApiError = (
     },
     { status }
   );
-};
-
-export const fetchCountries = async () => {
-  try {
-    const data = await apiFetchJson<{ success: boolean; data?: unknown[] }>(
-      '/api/countries',
-      { errorMessage: 'Failed to fetch countries', retry: 1 }
-    );
-
-    if (!data?.success) {
-      return [];
-    }
-
-    const payload = Array.isArray((data as any).countries) ? (data as any).countries : data.data;
-    return Array.isArray(payload) ? payload : [];
-  } catch (error) {
-    console.error('Error fetching countries:', error);
-    return [];
-  }
-};
-
-export const fetchProducts = async () => {
-  try {
-    const data = await apiFetchJson<{ success: boolean; data?: unknown[] }>(
-      '/api/products',
-      { errorMessage: 'Failed to fetch products', retry: 1 }
-    );
-
-    if (!data?.success) {
-      return [];
-    }
-
-    return Array.isArray(data.data) ? data.data : [];
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    return [];
-  }
-};
-
-export const fetchClaims = async (productId: string, countryCodeValue: string) => {
-  try {
-    const normalizedProductId = productId?.trim();
-    if (!normalizedProductId) {
-      return { success: false, error: 'Product ID is required.', data: [] };
-    }
-
-    const params = new URLSearchParams();
-    const normalizedCountryCode = countryCodeValue?.trim();
-    if (normalizedCountryCode) {
-      params.set('countryCode', normalizedCountryCode);
-    }
-
-    const query = params.toString();
-    const url = `/api/products/${encodeURIComponent(normalizedProductId)}/stacked-claims${query ? `?${query}` : ''}`;
-
-    const data = await apiFetchJson<{ success: boolean; data?: unknown; error?: string }>(
-      url,
-      { errorMessage: 'Failed to fetch claims', retry: 1 }
-    );
-
-    if (data?.success) {
-      return data;
-    }
-
-    const fallbackData = Array.isArray((data as any)?.data) ? (data as any).data : [];
-    return { success: false, error: data?.error || 'Failed to fetch claims.', data: fallbackData };
-  } catch (error) {
-    if (error instanceof ApiClientError && error.status === 404) {
-      return { success: false, error: 'Claims not found.', data: [] };
-    }
-    console.error('Error fetching claims for product:', productId, 'country:', countryCodeValue, error);
-    return { success: false, error: 'Failed to fetch claims.', data: [] };
-  }
 };

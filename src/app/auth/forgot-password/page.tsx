@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Spinner } from '@/components/spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { ApiClientError, apiFetchJson } from '@/lib/api-client';
-import { TurnstileChallenge } from '@/components/security/turnstile-challenge';
+import { TurnstileChallenge } from '@/components/features/security/turnstile-challenge';
 
 // Initialize the Supabase client outside the component to ensure it's a stable singleton instance.
 // This is critical for the PKCE flow's state to be preserved in sessionStorage.
@@ -96,12 +96,12 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="flex justify-center">
           <Link href="/" aria-label="Go to homepage">
-            <Image 
-              src="/Mixerai2.0Logo.png" 
+            <Image
+              src="/Mixerai2.0Logo.png"
               alt="MixerAI 2.0 Logo"
-              width={250} 
-              height={58} 
-              priority 
+              width={250}
+              height={58}
+              priority
             />
           </Link>
         </div>

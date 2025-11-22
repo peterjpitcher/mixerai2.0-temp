@@ -68,7 +68,7 @@ export default function ClaimsWorkflowsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/claims/workflows');
+      const response = await apiFetch('/api/claims/workflows');
       const apiResponse = await response.json();
       
       if (!apiResponse.success) {

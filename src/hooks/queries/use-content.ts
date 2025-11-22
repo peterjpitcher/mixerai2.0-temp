@@ -38,7 +38,7 @@ export function useContentList(filters: ContentFilters = {}) {
         if (value) params.append(key, value);
       });
 
-      const response = await fetch(`/api/content?${params}`, {
+      const response = await apiFetch(`/api/content?${params}`, {
         credentials: 'include',
       });
 
@@ -57,7 +57,7 @@ export function useContent(id: string) {
   return useQuery({
     queryKey: contentQueryKeys.detail(id),
     queryFn: async () => {
-      const response = await fetch(`/api/content/${id}`, {
+      const response = await apiFetch(`/api/content/${id}`, {
         credentials: 'include',
       });
 

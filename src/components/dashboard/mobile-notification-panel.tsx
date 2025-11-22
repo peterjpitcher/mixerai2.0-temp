@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Bell, CheckCheck, Clock, AlertCircle, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -25,7 +25,7 @@ export function MobileNotificationPanel() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  
+
   useEffect(() => {
     // In a real implementation, we would fetch from an API
     const fetchNotifications = async () => {
@@ -62,14 +62,14 @@ export function MobileNotificationPanel() {
           actionLabel: 'Review Now'
         }
       ];
-      
+
       setNotifications(mockNotifications);
       setUnreadCount(mockNotifications.filter(n => !n.isRead).length);
     };
-    
+
     fetchNotifications();
   }, []);
-  
+
   const markAllAsRead = () => {
     setNotifications(notifications.map(notification => ({
       ...notification,
@@ -77,7 +77,7 @@ export function MobileNotificationPanel() {
     })));
     setUnreadCount(0);
   };
-  
+
   const markAsRead = (id: string) => {
     setNotifications(notifications.map(notification => {
       if (notification.id === id && !notification.isRead) {
@@ -87,19 +87,19 @@ export function MobileNotificationPanel() {
       return notification;
     }));
   };
-  
+
   const clearAll = () => {
     setNotifications([]);
     setUnreadCount(0);
     setIsOpen(false);
   };
-  
+
   const handleActionClick = (notification: Notification) => {
     if (!notification.isRead) {
       markAsRead(notification.id);
     }
   };
-  
+
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
       case 'success':
@@ -112,12 +112,12 @@ export function MobileNotificationPanel() {
         return <Bell className="h-5 w-5 text-blue-500" />;
     }
   };
-  
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) {
       return 'just now';
     } else if (diffInSeconds < 3600) {
@@ -131,7 +131,7 @@ export function MobileNotificationPanel() {
       return `${days} ${days === 1 ? 'day' : 'days'} ago`;
     }
   };
-  
+
   return (
     <div className="block md:hidden">
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -163,18 +163,18 @@ export function MobileNotificationPanel() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              {notifications.length > 0 
-                ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}.` 
+              {notifications.length > 0
+                ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}.`
                 : 'You have no notifications.'}
             </p>
           </SheetHeader>
-          
+
           <ScrollArea className="h-[calc(100vh-5rem)]">
             <div className="space-y-1 p-1">
               {notifications.length > 0 ? (
                 notifications.map((notification) => (
-                  <Card 
-                    key={notification.id} 
+                  <Card
+                    key={notification.id}
                     className={cn(
                       "rounded-none border-x-0 shadow-none transition-all hover:bg-muted/50",
                       !notification.isRead && "border-l-4",
@@ -197,8 +197,8 @@ export function MobileNotificationPanel() {
                           </div>
                           <p className="text-sm text-muted-foreground">{notification.message}</p>
                           {notification.actionUrl && notification.actionLabel && (
-                            <Button 
-                              variant="link" 
+                            <Button
+                              variant="link"
                               className="h-auto p-0 text-sm"
                               onClick={() => handleActionClick(notification)}
                               asChild

@@ -8,7 +8,7 @@ import { Loader2, ShieldAlert } from 'lucide-react';
 import { ProductClaimsAnnouncement } from '@/components/dashboard/claims/product-claims-announcement';
 import { useAuth, usePermissions } from '@/contexts/auth-context';
 import { useBrands } from '@/contexts/brand-context';
-import { deriveRoleFlags } from '@/components/layout/unified-navigation-v2';
+import { deriveRoleFlags } from '@/components/features/navigation/unified-navigation-v2';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function ClaimsLayout({ children }: { children: ReactNode }) {

@@ -124,7 +124,7 @@ export default function EditProductPage() {
       setIsLoadingIngredients(true);
       setError(null);
       try {
-        const productResponse = await fetch(`/api/products/${id}`);
+        const productResponse = await apiFetch(`/api/products/${id}`);
         if (!productResponse.ok) {
           const errorData = await productResponse.json().catch(() => ({}));
           if (productResponse.status === 404) throw new Error("Product not found.");
@@ -151,7 +151,7 @@ export default function EditProductPage() {
       }
 
       try {
-        const brandsResponse = await fetch('/api/master-claim-brands');
+        const brandsResponse = await apiFetch('/api/master-claim-brands');
         if (!brandsResponse.ok) {
           const errorData = await brandsResponse.json().catch(() => ({}));
           throw new Error(errorData.error || 'Failed to fetch master claim brands for selection.');
@@ -175,7 +175,7 @@ export default function EditProductPage() {
 
       // Fetch All Ingredients
       try {
-        const ingredientsResponse = await fetch('/api/ingredients');
+        const ingredientsResponse = await apiFetch('/api/ingredients');
         if (!ingredientsResponse.ok) {
           const errorData = await ingredientsResponse.json().catch(() => ({}));
           throw new Error(errorData.error || 'Failed to fetch ingredients.');
@@ -198,7 +198,7 @@ export default function EditProductPage() {
       // Fetch Associated Ingredients for this Product
       if (id) {
         try {
-          const associatedIngredientsResponse = await fetch(`/api/products/${id}/ingredients`);
+          const associatedIngredientsResponse = await apiFetch(`/api/products/${id}/ingredients`);
           if (!associatedIngredientsResponse.ok) {
             const errorData = await associatedIngredientsResponse.json().catch(() => ({}));
             throw new Error(errorData.error || 'Failed to fetch associated ingredients.');
@@ -235,7 +235,7 @@ export default function EditProductPage() {
       setIsLoadingStackedClaims(true);
       setStackedClaimsError(null);
       try {
-        const response = await fetch(`/api/products/${id}/stacked-claims?countryCode=${selectedCountry}`);
+        const response = await apiFetch(`/api/products/${id}/stacked-claims?countryCode=${selectedCountry}`);
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || "Failed to fetch stacked claims.");
@@ -264,7 +264,7 @@ export default function EditProductPage() {
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const response = await fetch('/api/countries');
+        const response = await apiFetch('/api/countries');
         const data = await response.json();
         if (data.success) {
           setCountries(data.countries ?? data.data);

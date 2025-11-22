@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { TemplateForm } from '@/components/template/template-form';
+import { TemplateForm } from '@/components/features/templates/template-form';
 import { ArrowLeft, Loader2, ShieldAlert, HelpCircle, AlertTriangle } from 'lucide-react';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { useTemplateSession } from '../use-template-session';
@@ -62,29 +62,29 @@ export default function NewTemplatePage() {
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        { label: "Content Templates", href: "/dashboard/templates" }, 
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Content Templates", href: "/dashboard/templates" },
         { label: "Create New Template" }
       ]} />
 
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => window.location.href = '/dashboard/templates'}
-                aria-label="Back to Templates"
-            >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-            </Button>
-            <div>
-                <h1 className="text-2xl font-bold tracking-tight">Create Template</h1>
-                <p className="text-muted-foreground mt-1">Design a new content template with custom fields.</p>
-            </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.location.href = '/dashboard/templates'}
+            aria-label="Back to Templates"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Create Template</h1>
+            <p className="text-muted-foreground mt-1">Design a new content template with custom fields.</p>
+          </div>
         </div>
-        <Link 
-          href="/dashboard/help#templates" 
+        <Link
+          href="/dashboard/help#templates"
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />

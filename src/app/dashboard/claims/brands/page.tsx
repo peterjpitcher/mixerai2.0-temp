@@ -30,6 +30,7 @@ import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Globe, Pencil, More
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +60,7 @@ export default function MasterClaimBrandsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/master-claim-brands'); 
+        const response = await apiFetch('/api/master-claim-brands'); 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || 'Failed to fetch master claim brands');

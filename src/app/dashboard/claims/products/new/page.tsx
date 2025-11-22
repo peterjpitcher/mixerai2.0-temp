@@ -42,7 +42,7 @@ export default function NewProductPage() {
     async function fetchMasterBrands() {
       setIsLoadingBrands(true);
       try {
-        const response = await fetch('/api/master-claim-brands');
+        const response = await apiFetch('/api/master-claim-brands');
         if (!response.ok) {
           throw new Error('Failed to fetch master claim brands');
         }

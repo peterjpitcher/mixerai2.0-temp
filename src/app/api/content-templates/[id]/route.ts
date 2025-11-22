@@ -8,6 +8,7 @@ import { User } from '@supabase/supabase-js';
 import { createApiErrorResponse } from '@/lib/api-error-handler';
 import { OutputFieldSchema, InputFieldSchema } from '@/lib/schemas/template';
 import { isSystemTemplateId } from '@/lib/templates/system-templates';
+import { generateTemplateDescription } from '@/lib/ai/generate-template-description';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -39,25 +40,6 @@ async function getAccessibleBrandIds(
 
 function isPlatformAdmin(user: User, accessibleBrandIds: string[]): boolean {
   return user.user_metadata?.role === 'admin' && accessibleBrandIds.length === 0;
-}
-
-function resolveInternalApiUrl(request: NextRequest, path: string): URL | null {
-  const candidates = [
-    request?.nextUrl?.origin,
-    process.env.APP_URL,
-    process.env.NEXT_PUBLIC_APP_URL,
-  ].filter((value): value is string => Boolean(value));
-
-  for (const candidate of candidates) {
-    try {
-      const base = new URL(candidate);
-      return new URL(path, base);
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
 }
 
 /**
@@ -243,31 +225,16 @@ export const PUT = withAuthAndCSRF(async (
         const inputFieldNames = (data.inputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
         const outputFieldNames = (data.outputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
 
-        const aiEndpointUrl = resolveInternalApiUrl(request, '/api/ai/generate-template-description');
+        const generatedDescriptionResult = await generateTemplateDescription({
+          templateName: data.name,
+          inputFields: inputFieldNames,
+          outputFields: outputFieldNames
+        });
 
-        if (!aiEndpointUrl) {
-          console.warn('[content-templates][PUT] Unable to determine origin for AI description request. Skipping regeneration.');
+        if (generatedDescriptionResult) {
+          generatedDescription = generatedDescriptionResult;
         } else {
-          const brandIdForAi = (data.brand_id ?? existingTemplate.brand_id) || undefined;
-          const aiDescriptionResponse = await fetch(aiEndpointUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              templateName: data.name,
-              inputFields: inputFieldNames,
-              outputFields: outputFieldNames,
-              brand_id: brandIdForAi,
-            }),
-          });
-
-          if (aiDescriptionResponse.ok) {
-            const aiData = await aiDescriptionResponse.json();
-            if (aiData.success && aiData.description) {
-              generatedDescription = aiData.description;
-            }
-          } else {
-            console.warn('[content-templates][PUT] AI description request failed with status', aiDescriptionResponse.status);
-          }
+          console.warn('[content-templates][PUT] AI description generation failed.');
         }
       } catch {
         // console.warn('Error calling AI template description generation service on update:', aiError);

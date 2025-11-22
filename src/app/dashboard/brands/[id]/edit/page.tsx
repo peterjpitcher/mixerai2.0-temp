@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MultiSelectCheckboxCombobox } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, AlertTriangle, Sparkles, Info } from 'lucide-react';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { SaveStatusIndicator } from '@/components/ui/save-status';
@@ -143,7 +143,7 @@ const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | un
 export default function BrandEditPage({ params }: BrandEditPageProps) {
   const router = useRouter();
   const { id } = params;
-  
+
   const [, setBrand] = useState<Record<string, unknown> | null>(null);
   const [isLoadingBrand, setIsLoadingBrand] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +155,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     website_url: '',
@@ -253,7 +253,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     },
     [agencyLookupById, agencyLookupByName]
   );
-  
+
   const breadcrumbItems = [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Brands", href: "/dashboard/brands" },
@@ -552,10 +552,10 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   };
 
   const handleAddAdditionalUrlField = () => {
-      setFormData(prev => ({
-        ...prev,
+    setFormData(prev => ({
+      ...prev,
       additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: '' }]
-      }));
+    }));
   };
 
   const handleRemoveAdditionalUrl = (idToRemove: string) => {
@@ -594,9 +594,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       toast.error('Please enter a brand name first.');
       return;
     }
-     if (!canGenerateIdentity) {
-       toast.error('Please enter at least one website URL (main or additional) to generate identity.');
-       return;
+    if (!canGenerateIdentity) {
+      toast.error('Please enter at least one website URL (main or additional) to generate identity.');
+      return;
     }
     const urls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)].filter(url => url && url.trim() !== '');
     for (const url of urls) {
@@ -655,7 +655,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           });
         }
         toast.success('Brand identity generated successfully!');
-        setActiveTab('identity'); 
+        setActiveTab('identity');
       } else {
         throw new Error(data.error || 'Failed to parse generation response');
       }
@@ -705,8 +705,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
       const suggestionIds: string[] = Array.isArray(payload.data?.suggestions)
         ? payload.data.suggestions
-            .map((entry: { record?: { id?: string } }) => entry?.record?.id)
-            .filter((id: unknown): id is string => typeof id === 'string')
+          .map((entry: { record?: { id?: string } }) => entry?.record?.id)
+          .filter((id: unknown): id is string => typeof id === 'string')
         : [];
 
       if (suggestionIds.length > 0) {
@@ -737,11 +737,11 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           country_code: record.countryCode
             ? String(record.countryCode).toUpperCase()
             : record.country_code
-            ? String(record.country_code).toUpperCase()
-            : null,
+              ? String(record.country_code).toUpperCase()
+              : null,
           priority: mapNumericPriorityToLabel(
             (record.priority as number | string | null | undefined) ??
-              (record.priorityLabel as string | null | undefined),
+            (record.priorityLabel as string | null | undefined),
           ),
         }))
         .filter((agency) => agency.id && agency.name);
@@ -828,9 +828,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         master_claim_brand_ids: formData.master_claim_brand_ids, // Include the array of master claim brand IDs
       };
       payload.content_vetting_agencies = validAgencyIds;
-      
+
       Object.keys(payload).forEach(key => {
-        if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0) ) {
+        if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0)) {
           payload[key] = null;
         }
       });
@@ -840,23 +840,23 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
       // Temporary workaround for CloudFlare 403 issue with PUT requests
       const response = await apiClient.post(`/api/brands/${id}?_method=PUT`, payload);
-      
+
       // Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         // If not JSON, try to get text for error message
         const text = await response.text();
         console.error('Non-JSON response:', text);
-        throw new Error(response.status === 403 ? 'Permission denied' : 
-                       response.status === 429 ? 'Too many requests. Please try again later.' :
-                       'Server error. Please try again.');
+        throw new Error(response.status === 403 ? 'Permission denied' :
+          response.status === 429 ? 'Too many requests. Please try again later.' :
+            'Server error. Please try again.');
       }
-      
+
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to update brand');
       }
-      
+
       // Only show success toast and redirect on manual save
       if (isManualSave) {
         toast.success('Brand updated successfully!');
@@ -877,7 +877,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       setIsSaving(false);
     }
   };
-  
+
   // Configure auto-save
   const {
     isSaving: isAutoSaving,
@@ -1060,24 +1060,24 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   }
   if (error) {
     return (
-        <div className="container mx-auto px-4 py-8 text-center">
-            <Card className="max-w-md mx-auto">
-                <CardHeader><CardTitle className="text-destructive">Error</CardTitle></CardHeader>
-                <CardContent><p>{error}</p></CardContent>
-                <CardFooter>
-                    <Button onClick={() => router.push('/dashboard/brands')} variant="outline">
-                        Back to Brands List
-                    </Button>
-                </CardFooter>
-            </Card>
-        </div>
+      <div className="container mx-auto px-4 py-8 text-center">
+        <Card className="max-w-md mx-auto">
+          <CardHeader><CardTitle className="text-destructive">Error</CardTitle></CardHeader>
+          <CardContent><p>{error}</p></CardContent>
+          <CardFooter>
+            <Button onClick={() => router.push('/dashboard/brands')} variant="outline">
+              Back to Brands List
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
       <BreadcrumbNav items={breadcrumbItems} className="mb-4" showHome={false} separator="/" />
-      
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/brands')} aria-label="Back to Brands">
@@ -1095,7 +1095,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                 unoptimized={formData.logo_url.includes('supabase')}
               />
             ) : (
-              <div 
+              <div
                 className="w-full h-full flex items-center justify-center text-xl font-bold text-white"
                 style={{ backgroundColor: formData.brand_color || '#3498db' }}
               >
@@ -1118,7 +1118,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           />
         </div>
       </div>
-       
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="basic">Basic Details</TabsTrigger>
@@ -1137,13 +1137,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                   <div className="grid grid-cols-12 gap-4 items-center">
                     <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right">Brand Name <span className="text-destructive">*</span></Label>
                     <div className="col-span-12 sm:col-span-9">
-                      <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required/>
+                      <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required />
                     </div>
                   </div>
                   <div className="grid grid-cols-12 gap-4 items-center">
                     <Label htmlFor="website_url" className="col-span-12 sm:col-span-3 text-left sm:text-right">Main Website URL</Label>
                     <div className="col-span-12 sm:col-span-9">
-                      <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url"/>
+                      <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url" />
                     </div>
                   </div>
                   <div className="grid grid-cols-12 gap-4 items-center">
@@ -1162,8 +1162,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     <div className="col-span-12 sm:col-span-9">
                       <Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}>
                         <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {availableLanguageOptions.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
+                        <SelectContent className="max-h-[300px]">
+                          {availableLanguageOptions.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1203,7 +1203,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                               unoptimized={formData.logo_url.includes('supabase')}
                             />
                           ) : (
-                            <div 
+                            <div
                               className="w-full h-full flex items-center justify-center text-4xl font-bold text-white"
                               style={{ backgroundColor: formData.brand_color || '#3498db' }}
                             >
@@ -1229,21 +1229,21 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     <div className="space-y-2">
                       <Label htmlFor="brand_color_basic_tab">Brand Colour</Label>
                       <div className="flex gap-2 items-center">
-                        <input 
-                            type="color" 
-                            id="brand_color_basic_tab"
-                            name="brand_color" 
-                            value={formData.brand_color} 
-                            onChange={handleInputChange} 
-                            className="w-10 h-10 rounded cursor-pointer border"
+                        <input
+                          type="color"
+                          id="brand_color_basic_tab"
+                          name="brand_color"
+                          value={formData.brand_color}
+                          onChange={handleInputChange}
+                          className="w-10 h-10 rounded cursor-pointer border"
                         />
-                        <Input 
-                            id="brand_color_hex_basic_tab"
-                            value={formData.brand_color} 
-                            onChange={handleInputChange} 
-                            name="brand_color" 
-                            placeholder="#HEX" 
-                            className="w-32"
+                        <Input
+                          id="brand_color_hex_basic_tab"
+                          value={formData.brand_color}
+                          onChange={handleInputChange}
+                          name="brand_color"
+                          placeholder="#HEX"
+                          className="w-32"
                         />
                       </div>
                       <div className="w-full h-12 rounded-md mt-2" style={{ backgroundColor: formData.brand_color }} />
@@ -1255,10 +1255,10 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
             </CardContent>
             <CardFooter className="flex justify-end space-x-2 border-t pt-6">
               <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
-                  Cancel
+                Cancel
               </Button>
               <Button onClick={() => handleSave(true)} disabled={isSaving || isAutoSaving || isGenerating}>
-                  {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+                {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
               </Button>
             </CardFooter>
           </Card>
@@ -1273,81 +1273,81 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
             <CardContent className="space-y-6">
               <div className="space-y-6">
                 <div className="space-y-4 border-b pb-4">
-                    <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
-                    <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
-                    <div className="grid grid-cols-12 gap-4">
-                      <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">
-                        Additional<br />Website URLs
-                      </Label>
-                      <div className="col-span-12 sm:col-span-9 space-y-2">
-                        {formData.additional_website_urls.map((urlObj) => {
-                          const isInvalid = invalidAdditionalUrlIds.includes(urlObj.id);
-                          return (
-                            <div key={urlObj.id} className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  value={urlObj.value}
-                                  onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
-                                  placeholder="https://additional-example.com"
-                                  className={cn(
-                                    'flex-grow',
-                                    isInvalid && 'border-destructive focus-visible:ring-destructive'
-                                  )}
-                                  type="url"
-                                  aria-invalid={isInvalid}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveAdditionalUrl(urlObj.id)}
-                                  className="h-8 w-8"
-                                  aria-label="Remove URL"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              {isInvalid && (
-                                <p className="text-xs text-destructive">
-                                  Enter a valid URL that starts with http:// or https://.
-                                </p>
-                              )}
+                  <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
+                  <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
+                  <div className="grid grid-cols-12 gap-4">
+                    <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">
+                      Additional<br />Website URLs
+                    </Label>
+                    <div className="col-span-12 sm:col-span-9 space-y-2">
+                      {formData.additional_website_urls.map((urlObj) => {
+                        const isInvalid = invalidAdditionalUrlIds.includes(urlObj.id);
+                        return (
+                          <div key={urlObj.id} className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={urlObj.value}
+                                onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
+                                placeholder="https://additional-example.com"
+                                className={cn(
+                                  'flex-grow',
+                                  isInvalid && 'border-destructive focus-visible:ring-destructive'
+                                )}
+                                type="url"
+                                aria-invalid={isInvalid}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveAdditionalUrl(urlObj.id)}
+                                className="h-8 w-8"
+                                aria-label="Remove URL"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
                             </div>
-                          );
-                        })}
-                        <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
-                          <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2 pt-2">
-                      <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
-                      <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating || !canGenerateIdentity} className="w-full">
-                        {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : ( <> <Sparkles className="mr-2 h-4 w-4" /> Generate Brand Identity </>)}
+                            {isInvalid && (
+                              <p className="text-xs text-destructive">
+                                Enter a valid URL that starts with http:// or https://.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
                       </Button>
                     </div>
                   </div>
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
+                    <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating || !canGenerateIdentity} className="w-full">
+                      {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : (<> <Sparkles className="mr-2 h-4 w-4" /> Generate Brand Identity </>)}
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-12 gap-4">
                     <Label htmlFor="brand_identity" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Brand Identity</Label>
                     <div className="col-span-12 sm:col-span-9">
-                      <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/>
+                      <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6} />
                     </div>
                   </div>
                   <div className="grid grid-cols-12 gap-4">
                     <Label htmlFor="tone_of_voice" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Tone of Voice</Label>
                     <div className="col-span-12 sm:col-span-9">
-                      <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/>
+                      <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4} />
                     </div>
                   </div>
                   <div className="grid grid-cols-12 gap-4">
                     <Label htmlFor="guardrails" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Content Guardrails</Label>
                     <div className="col-span-12 sm:col-span-9">
-                      <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/>
+                      <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4} />
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-12 gap-4">
                     <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">
                       Content Vetting<br />Agencies
@@ -1355,16 +1355,16 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     <div className="col-span-12 sm:col-span-9 space-y-2">
                       {renderVettingAgencyCheckboxes()}
                     </div>
+                  </div>
                 </div>
               </div>
-            </div>
             </CardContent>
             <CardFooter className="flex justify-end space-x-2 border-t pt-6">
               <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
-                  Cancel
+                Cancel
               </Button>
               <Button onClick={() => handleSave(true)} disabled={isSaving || isAutoSaving || isGenerating}>
-                  {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+                {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
               </Button>
             </CardFooter>
           </Card>

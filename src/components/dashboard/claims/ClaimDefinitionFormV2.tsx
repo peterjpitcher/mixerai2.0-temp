@@ -11,6 +11,7 @@ import { MultiSelectCheckboxCombobox, ComboboxOption } from '@/components/ui/Mul
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, ChevronRight, Info, Building2, Package, FlaskConical } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api-client';
 
 interface Entity {
   id: string;
@@ -124,7 +125,7 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
   useEffect(() => {
     const fetchData = async (url: string, setter: React.Dispatch<React.SetStateAction<ComboboxOption[]>>, entityName: string) => {
       try {
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         if (response.ok) {
           const result = await response.json();
           if (result.success && Array.isArray(result.data)) {
@@ -150,7 +151,7 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
     async function fetchClaimsWorkflows() {
       setIsLoadingWorkflows(true);
       try {
-        const response = await fetch('/api/claims/workflows');
+        const response = await apiFetch('/api/claims/workflows');
         if (response.ok) {
           const result = await response.json();
           if (result.success && Array.isArray(result.data)) {
@@ -173,7 +174,7 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
     // Fetch active countries from API
     (async () => {
       try {
-        const response = await fetch('/api/countries');
+        const response = await apiFetch('/api/countries');
         const result = await response.json();
         if (response.ok && result.success && Array.isArray(result.countries)) {
           const options = result.countries.map((c: { code: string; name: string }) => ({ value: c.code, label: c.name })) as ComboboxOption[];

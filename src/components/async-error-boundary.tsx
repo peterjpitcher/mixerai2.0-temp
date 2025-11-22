@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { ErrorBoundary } from './error-boundary';
+import { ErrorBoundary } from './ui/error-boundary';
 import { Loader2 } from 'lucide-react';
 
 interface AsyncBoundaryProps {
@@ -13,11 +13,11 @@ interface AsyncBoundaryProps {
  * Combines ErrorBoundary with Suspense for async components
  * Use this to wrap components that use async/await or data fetching
  */
-export function AsyncBoundary({ 
-  children, 
+export function AsyncBoundary({
+  children,
   fallback,
   loadingFallback,
-  onError 
+  onError
 }: AsyncBoundaryProps) {
   const defaultLoadingFallback = (
     <div className="flex items-center justify-center p-8">

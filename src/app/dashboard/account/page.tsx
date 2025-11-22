@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Spinner } from '@/components/spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { HelpCircle } from 'lucide-react';
@@ -392,26 +392,26 @@ export default function AccountPage() {
     const currentPassword = (form.elements.namedItem('current-password') as HTMLInputElement)?.value;
     const newPassword = (form.elements.namedItem('new-password') as HTMLInputElement)?.value;
     const confirmPassword = (form.elements.namedItem('confirm-password') as HTMLInputElement)?.value;
-    
+
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error('Please complete all password fields.', { description: 'Missing Fields' });
       return;
     }
-    
+
     // Validate new password against policy
     const validation = validatePassword(newPassword);
     if (!validation.valid) {
-      toast.error('Password does not meet requirements', { 
-        description: validation.errors[0] 
+      toast.error('Password does not meet requirements', {
+        description: validation.errors[0]
       });
       return;
     }
-    
+
     if (newPassword !== confirmPassword) {
       toast.error('Your new password and confirmation password do not match.', { description: 'Password Mismatch' });
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       const reauthResponse = await apiFetch('/api/auth/check-reauthentication', {
@@ -419,12 +419,12 @@ export default function AccountPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operation: 'change-password' }),
       });
-      
+
       const reauthData = await reauthResponse.json();
       if (!reauthResponse.ok || !reauthData?.success) {
         throw new Error(reauthData?.error || 'Unable to verify session state for password change.');
       }
-      
+
       if (reauthData.requiresReauthentication) {
         toast.error('For security reasons, please log in again before changing your password.', {
           description: 'Re-authentication Required',
@@ -509,8 +509,8 @@ export default function AccountPage() {
             Manage your profile, password, and notification preferences.
           </p>
         </div>
-        <Link 
-          href="/dashboard/help#account" 
+        <Link
+          href="/dashboard/help#account"
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
@@ -524,7 +524,7 @@ export default function AccountPage() {
           <TabsTrigger value="password">Password</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="profile">
           <Card>
             <form onSubmit={handleProfileSubmit}>
@@ -544,7 +544,7 @@ export default function AccountPage() {
                     email={profileData.email}
                   />
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="grid grid-cols-12 gap-4 items-center">
                     <Label htmlFor="fullName" className="col-span-12 sm:col-span-3 text-left sm:text-right">Full Name <span className="text-destructive">*</span></Label>
@@ -562,13 +562,13 @@ export default function AccountPage() {
                   <div className="grid grid-cols-12 gap-4 items-center">
                     <Label htmlFor="company" className="col-span-12 sm:col-span-3 text-left sm:text-right">Company</Label>
                     <div className="col-span-12 sm:col-span-9">
-                      <Input id="company" value={profileData.company} onChange={handleProfileChange} placeholder="General Mills"/>
+                      <Input id="company" value={profileData.company} onChange={handleProfileChange} placeholder="General Mills" />
                     </div>
                   </div>
                   <div className="grid grid-cols-12 gap-4 items-center">
                     <Label htmlFor="jobTitle" className="col-span-12 sm:col-span-3 text-left sm:text-right">Job Title</Label>
                     <div className="col-span-12 sm:col-span-9">
-                      <Input id="jobTitle" value={profileData.jobTitle} onChange={handleProfileChange} placeholder="e.g. Content Strategist"/>
+                      <Input id="jobTitle" value={profileData.jobTitle} onChange={handleProfileChange} placeholder="e.g. Content Strategist" />
                     </div>
                   </div>
                 </div>
@@ -592,7 +592,7 @@ export default function AccountPage() {
             </form>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="password">
           <Card>
             <form onSubmit={handlePasswordSubmit}>
@@ -612,7 +612,7 @@ export default function AccountPage() {
                 <div className="grid grid-cols-12 gap-4 items-start">
                   <Label htmlFor="new-password" className="col-span-12 sm:col-span-3 text-left sm:text-right mt-2">New Password <span className="text-destructive">*</span></Label>
                   <div className="col-span-12 sm:col-span-9 space-y-2">
-                    <Input id="new-password" name="new-password" type="password" required minLength={12} placeholder="Enter a strong password"/>
+                    <Input id="new-password" name="new-password" type="password" required minLength={12} placeholder="Enter a strong password" />
                     <div className="text-xs text-muted-foreground space-y-1">
                       <p className="font-medium">Password must contain:</p>
                       <ul className="list-disc list-inside space-y-0.5 ml-2">
@@ -639,7 +639,7 @@ export default function AccountPage() {
             </form>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="notifications">
           <Card>
             <form onSubmit={handleNotificationSettingsSubmit}>
@@ -664,7 +664,7 @@ export default function AccountPage() {
                     aria-label="Toggle email notifications"
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 rounded-md border hover:bg-muted/50">
                   <div className="space-y-0.5">
                     <Label htmlFor="contentUpdates" className="font-medium">Content Activity</Label>
@@ -679,7 +679,7 @@ export default function AccountPage() {
                     aria-label="Toggle content activity notifications"
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 rounded-md border hover:bg-muted/50">
                   <div className="space-y-0.5">
                     <Label htmlFor="newComments" className="font-medium">New Comments & Mentions</Label>
@@ -694,7 +694,7 @@ export default function AccountPage() {
                     aria-label="Toggle new comments and mentions notifications"
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 rounded-md border hover:bg-muted/50">
                   <div className="space-y-0.5">
                     <Label htmlFor="taskReminders" className="font-medium">Task Reminders</Label>
@@ -709,7 +709,7 @@ export default function AccountPage() {
                     aria-label="Toggle task reminder notifications"
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 rounded-md border hover:bg-muted/50">
                   <div className="space-y-0.5">
                     <Label htmlFor="marketingEmails" className="font-medium">Product News & Offers</Label> {/* Changed from Marketing Emails */}

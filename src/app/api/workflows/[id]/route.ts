@@ -14,6 +14,7 @@ import {
 } from '@/lib/auth/brand-access';
 import type { User } from '@supabase/supabase-js';
 import type { Json } from '@/types/supabase';
+import { generateWorkflowDescription } from '@/lib/ai/generate-workflow-description';
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -339,23 +340,15 @@ export const PUT = withAuthAndCSRF(async (
 
           const stepNamesForDesc = (Array.isArray(stepsForDesc) ? stepsForDesc.map((step: Record<string, unknown>) => step.name) : []).filter(Boolean);
           
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-          const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              workflowName: wfName,
-              brandName: brandNameForDesc,
-              templateName: resolvedTemplateNameForDesc,
-              stepNames: stepNamesForDesc,
-            }),
+          const generatedDescription = await generateWorkflowDescription({
+            workflowName: wfName,
+            brandName: brandNameForDesc,
+            templateName: resolvedTemplateNameForDesc || undefined,
+            stepNames: stepNamesForDesc as string[],
           });
 
-          if (aiDescriptionResponse.ok) {
-            const aiData = await aiDescriptionResponse.json();
-            if (aiData.success && aiData.description) {
-              workflowDescriptionToUpdate = aiData.description;
-            }
+          if (generatedDescription) {
+            workflowDescriptionToUpdate = generatedDescription;
           } else {
             console.warn('Failed to regenerate AI description on update.');
           }

@@ -40,7 +40,7 @@ export function useWorkflowsList(brandId?: string) {
         ? `/api/workflows?brandId=${brandId}`
         : '/api/workflows';
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         credentials: 'include',
       });
 
@@ -59,7 +59,7 @@ export function useWorkflow(id: string) {
   return useQuery({
     queryKey: workflowQueryKeys.detail(id),
     queryFn: async () => {
-      const response = await fetch(`/api/workflows/${id}`, {
+      const response = await apiFetch(`/api/workflows/${id}`, {
         credentials: 'include',
       });
 

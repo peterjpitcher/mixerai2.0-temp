@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Camera, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
-import { Spinner } from '@/components/spinner';
-import { 
-  validateFile, 
-  validateFileContent, 
-  generateUniqueFileName, 
-  validateImageDimensions 
+import { Spinner } from '@/components/ui/spinner';
+import {
+  validateFile,
+  validateFileContent,
+  generateUniqueFileName,
+  validateImageDimensions
 } from '@/lib/validation/file-upload';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { apiFetch } from '@/lib/api-client';
@@ -23,9 +23,9 @@ interface AvatarUploadProps {
   email?: string;
 }
 
-export function AvatarUpload({ 
-  currentAvatarUrl, 
-  onAvatarChange, 
+export function AvatarUpload({
+  currentAvatarUrl,
+  onAvatarChange,
   userId,
   fullName,
   email,
@@ -123,7 +123,7 @@ export function AvatarUpload({
 
       // Update the preview
       setPreviewUrl(publicUrl);
-      
+
       // Update the profile
       const response = await apiFetch('/api/user/profile', {
         method: 'PUT',
@@ -138,7 +138,7 @@ export function AvatarUpload({
 
       // Call the parent callback
       onAvatarChange(publicUrl);
-      
+
       toast.success('Profile photo updated successfully');
     } catch (error) {
       console.error('Error uploading avatar:', error);
@@ -154,7 +154,7 @@ export function AvatarUpload({
 
   const handleRemoveAvatar = async () => {
     if (!previewUrl) return;
-    
+
     setIsUploading(true);
     try {
       if (!userId) {
@@ -214,7 +214,7 @@ export function AvatarUpload({
           </div>
         )}
       </div>
-      
+
       <div className="flex flex-col gap-2">
         <input
           ref={fileInputRef}
@@ -224,7 +224,7 @@ export function AvatarUpload({
           className="hidden"
           disabled={isUploading || !supabaseClient}
         />
-        
+
         <Button
           type="button"
           variant="outline"
@@ -244,7 +244,7 @@ export function AvatarUpload({
             </>
           )}
         </Button>
-        
+
         {previewUrl && (
           <Button
             type="button"
@@ -257,7 +257,7 @@ export function AvatarUpload({
             Remove
           </Button>
         )}
-        
+
         {supabaseError && (
           <p className="text-xs text-destructive">
             Profile photo uploads are unavailable: {supabaseError}

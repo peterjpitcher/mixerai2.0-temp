@@ -1,6 +1,6 @@
 'use client';
 
-import { Spinner } from '@/components/spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { TYPOGRAPHY } from '@/lib/utils/ui-standards';
 
@@ -14,11 +14,11 @@ interface LoadingStateProps {
 /**
  * Consistent loading state component that follows UI standards
  */
-export function LoadingState({ 
-  message = 'Loading...', 
+export function LoadingState({
+  message = 'Loading...',
   size = 'md',
   fullPage = false,
-  className 
+  className
 }: LoadingStateProps) {
   const containerClasses = cn(
     'flex flex-col items-center justify-center gap-4',

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import axios from 'axios';
 import sanitizeHtml from 'sanitize-html';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js';
 import { z } from 'zod';
-import { Readable } from 'stream';
 
 import { COUNTRIES } from '@/lib/constants';
 import { recommendVettingAgencies } from '@/lib/vetting-agencies/recommendations';
@@ -144,13 +142,11 @@ function getLanguageName(languageCode: string): string {
     'ar-SA': 'Arabic',
     'ru-RU': 'Russian'
   };
-  
+
   return languageMap[languageCode] || languageCode;
 }
 
 // Function to extract website content from a URL
-const MAX_DOWNLOAD_BYTES = MAX_CHARACTERS_PER_URL * 160; // cap raw payload before sanitisation
-
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [],
   allowedAttributes: {},
@@ -190,19 +186,6 @@ function cleanScrapedContent(rawContent: string): CleanContentResult {
 
 function getErrorMessage(error: unknown): string {
   if (!error) return 'Unknown error';
-  if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    const reason = error.response?.statusText;
-    if (status) {
-      return `HTTP ${status}${reason ? ` ${reason}` : ''}`;
-    }
-    if (error.code) {
-      return error.code;
-    }
-    if (typeof error.message === 'string') {
-      return error.message;
-    }
-  }
   if (error instanceof Error) {
     return error.message;
   }
@@ -210,52 +193,6 @@ function getErrorMessage(error: unknown): string {
     return error;
   }
   return 'Unknown error';
-}
-
-async function scrapeWithAxios(url: string): Promise<CleanContentResult> {
-  const response = await axios.get(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-GB,en;q=0.5',
-      'Accept-Encoding': 'identity',
-    },
-    timeout: 10000,
-    responseType: 'stream',
-    decompress: true,
-    maxRedirects: 5,
-    validateStatus: (status) => status >= 200 && status < 400,
-  });
-
-  const stream = response.data as Readable;
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
-
-  try {
-    for await (const chunk of stream) {
-      const buffer = Buffer.isBuffer(chunk)
-        ? chunk
-        : Buffer.from(typeof chunk === 'string' ? chunk : new Uint8Array(chunk as ArrayBuffer));
-      totalBytes += buffer.length;
-      if (totalBytes > MAX_DOWNLOAD_BYTES) {
-        if (typeof stream.destroy === 'function') {
-          stream.destroy();
-        } else if (
-          typeof (stream as unknown as { cancel?: () => Promise<void> | void }).cancel === 'function'
-        ) {
-          await (stream as unknown as { cancel: () => Promise<void> | void }).cancel();
-        }
-        throw new Error(`Page content exceeded the ${Math.round(MAX_DOWNLOAD_BYTES / 1024)}KB limit.`);
-      }
-      chunks.push(buffer);
-    }
-  } catch (streamError) {
-    throw streamError;
-  }
-
-  const rawContent = Buffer.concat(chunks).toString('utf-8');
-  return cleanScrapedContent(rawContent);
 }
 
 async function scrapeWebsiteContent(url: string): Promise<{ content: string; warnings: string[] }> {
@@ -283,24 +220,16 @@ async function scrapeWebsiteContent(url: string): Promise<{ content: string; war
       throw new Error('Requests to internal or reserved IP addresses are not allowed');
     }
 
-    const axiosResult = await scrapeWithAxios(url);
-    if (axiosResult.truncated) {
-      warnings.push(truncateNotice(url, axiosResult.originalLength, axiosResult.finalLength));
-    }
-    return { content: axiosResult.text, warnings };
-  } catch (primaryError) {
-    warnings.push(`Primary fetch failed for ${url}: ${getErrorMessage(primaryError)}`);
-  }
+    // Use fetchWebPageContent which uses native fetch
+    const rawContent = await fetchWebPageContent(url, 10000);
+    const cleaned = cleanScrapedContent(rawContent);
 
-  try {
-    const fallbackRaw = await fetchWebPageContent(url, 10000);
-    const cleaned = cleanScrapedContent(fallbackRaw);
     if (cleaned.truncated) {
       warnings.push(truncateNotice(url, cleaned.originalLength, cleaned.finalLength));
     }
     return { content: cleaned.text, warnings };
-  } catch (fallbackError) {
-    warnings.push(`Fallback fetch failed for ${url}: ${getErrorMessage(fallbackError)}`);
+  } catch (error) {
+    warnings.push(`Fetch failed for ${url}: ${getErrorMessage(error)}`);
   }
 
   throw new Error(warnings.join(' | '));
@@ -411,11 +340,11 @@ export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
     }
 
     const preparedScrapes = enforceCombinedCharacterLimit(successfulScrapes, processingWarnings);
-    
+
     // Prepare prompt for OpenAI
     const countryInfo = COUNTRIES.find(c => c.value === country);
     const countryName = countryInfo ? countryInfo.label : country;
-    
+
     // Determine specific language name for prompts
     let specificLanguageName = getLanguageName(language); // Default to mapped name or code
     if (language.toLowerCase() === 'en' && country === 'AU') {
@@ -433,13 +362,13 @@ export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
 Your analysis is clear, professional, and tailored to the specific brand and region.
 CRITICAL: Your entire response MUST be in the language specified by the user (${specificLanguageName}).
 Do not include any content in English unless the specified language is ${specificLanguageName} or a variant of English.`;
-    
+
     const userMessage = `Create a comprehensive brand identity profile for "${name}" based on the following website content:
     
 ${preparedScrapes.map(({ url, content }, index) => {
-  const safeContent = content && content.trim().length > 0 ? content : '[No readable content extracted from this URL.]';
-  return `URL ${index + 1}: ${url}\n${safeContent}\n`;
-}).join('\n')}
+      const safeContent = content && content.trim().length > 0 ? content : '[No readable content extracted from this URL.]';
+      return `URL ${index + 1}: ${url}\n${safeContent}\n`;
+    }).join('\n')}
 
 The brand operates in ${countryName} and communicates in ${specificLanguageName}.
 
@@ -462,7 +391,7 @@ Set the "suggestedAgencies" field in your response to an empty array; compliance
 
 Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies, and brandColor.
 Remember that ALL text fields (except potentially within agency names) must be written in ${specificLanguageName}, and should avoid mentioning "${countryName}" or its nationality.`;
-    
+
     try {
       const modelToUse = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
       const completionResponse = await openai.chat.completions.create({
@@ -472,10 +401,10 @@ Remember that ALL text fields (except potentially within agency names) must be w
         temperature: 0.7,
         response_format: { type: "json_object" }, // Request JSON output
       });
-      
+
       const completion = completionResponse.choices[0]?.message?.content;
       if (!completion) throw new Error('No completion received from AI service.');
-      
+
       let jsonData;
       try {
         jsonData = JSON.parse(completion);
@@ -483,11 +412,11 @@ Remember that ALL text fields (except potentially within agency names) must be w
         // Log this parsing error securely on server-side in production
         throw new Error('AI service returned malformed JSON. Please try again.');
       }
-      
+
       const uniqueScrapeWarnings = Array.from(new Set(scrapeWarnings));
       const uniqueNormalizationWarnings = Array.from(new Set(normalizationWarnings));
       const uniqueProcessingWarnings = Array.from(new Set(processingWarnings));
-      
+
       // Validate and structure the result - remove defaults for missing fields
       const result = {
         brandIdentity: jsonData.brandIdentity,
@@ -573,12 +502,12 @@ Remember that ALL text fields (except potentially within agency names) must be w
       }
 
       return NextResponse.json({ success: true, data: result });
-      
+
     } catch (aiError) {
       // AI call or parsing failed. This will be handled by the outer catch block.
-      throw aiError; 
+      throw aiError;
     }
-    
+
   } catch (error) {
     const message =
       error instanceof Error && error.message
@@ -586,4 +515,5 @@ Remember that ALL text fields (except potentially within agency names) must be w
         : 'Failed to process brand identity request';
     return handleApiError(error, message);
   }
-}); 
+});
+

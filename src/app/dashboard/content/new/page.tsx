@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { ContentGeneratorForm } from '@/components/content/content-generator-form';
-import { AccessDenied } from '@/components/access-denied';
+import { ContentGeneratorForm } from '@/components/features/content/content-generator-form';
+import { AccessDenied } from '@/components/features/auth/access-denied';
 
 // This is now the main server component for the page route
 export default async function NewContentPage({
@@ -23,9 +23,9 @@ export default async function NewContentPage({
 
   return (
     <div className="space-y-6">
-       <Suspense fallback={<div>Loading form...</div>}>
-         <ContentGeneratorForm key={templateId || 'no-template'} templateId={templateId} />
-       </Suspense>
+      <Suspense fallback={<div>Loading form...</div>}>
+        <ContentGeneratorForm key={templateId || 'no-template'} templateId={templateId} />
+      </Suspense>
     </div>
   );
 } 

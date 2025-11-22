@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Plus, 
-  Search, 
-  ArrowUp, 
-  ArrowDown, 
-  Pencil, 
-  UserX, 
+import {
+  Plus,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  Pencil,
+  UserX,
   AlertCircle,
   Users2,
   Mail,
@@ -46,7 +46,7 @@ import { touchFriendly } from '@/lib/utils/touch-target';
 import { format as formatDateFns } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { apiFetch, apiFetchJson } from '@/lib/api-client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
@@ -283,7 +283,7 @@ export default function UsersPage() {
     void loadBrands();
     return () => controller.abort();
   }, [isAllowedToAccess, isLoadingUser]);
-  
+
   const staleCutoff = useMemo(() => {
     if (!staleFilter) return null;
     const threshold = new Date();
@@ -368,13 +368,13 @@ export default function UsersPage() {
     return sortedUsers.slice(start, start + PAGE_SIZE);
   }, [sortedUsers, page]);
   const isBusy = isLoading || (isLoadingBrands && allUsers.length === 0);
-  
+
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages]);
-  
+
   // Handle sort change
   const handleSort = (field: 'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at') => {
     if (field === sortField) {
@@ -390,7 +390,7 @@ export default function UsersPage() {
       }
     }
   };
-  
+
   // Deactivate user functionality
   const handleDeactivateUser = async () => {
     if (!userToDelete) return;
@@ -505,18 +505,18 @@ export default function UsersPage() {
     if (field !== sortField) return null;
     return sortDirection === 'asc' ? <ArrowUp className="ml-1 h-4 w-4" /> : <ArrowDown className="ml-1 h-4 w-4" />;
   };
-  
+
   // Helper function to render brand icons
   const renderBrandIcons = (user: User) => {
     if (!user.brand_permissions || user.brand_permissions.length === 0) {
       return <span className="text-muted-foreground text-xs">No brands</span>;
     }
-    
+
     return (
       <div className="flex flex-wrap gap-1">
         {user.brand_permissions.map((permission, index) => {
           const brand = permission.brand;
-          
+
           return (
             <BrandIcon
               key={`${permission.brand_id}-${index}`}
@@ -556,7 +556,7 @@ export default function UsersPage() {
       </div>
     );
   }
-  
+
   if (!isAllowedToAccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
@@ -593,17 +593,17 @@ export default function UsersPage() {
           </div>
         }
       />
-      
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Search users..." 
+        <Input
+          placeholder="Search users..."
           className="pl-10 max-w-md"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      
+
       <div className="flex flex-wrap items-center gap-3">
         <Select
           value={roleFilter}
@@ -651,7 +651,7 @@ export default function UsersPage() {
           <span>{loadError}</span>
         </div>
       )}
-      
+
       {isBusy ? (
         <div className="py-10 flex justify-center items-center min-h-[300px]">
           <div className="flex flex-col items-center">
@@ -746,82 +746,82 @@ export default function UsersPage() {
                     key={user.id}
                     className={`${hasGlobalAdmin ? 'bg-primary/5' : ''} ${isInactive ? 'opacity-60' : ''}`}
                   >
-                  <TableCell>
-                    <Avatar className="h-8 w-8">
-                      {getAvatarUrl(user.id, user.avatar_url) ? (
-                        <AvatarImage src={getAvatarUrl(user.id, user.avatar_url)} alt={user.full_name || 'User'} />
-                      ) : (
-                        <AvatarFallback className="text-xs font-semibold">
-                          {getNameInitials(user.full_name) || (user.full_name || 'U').charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                  </TableCell>
-                  <TableCell className="font-medium">{user.full_name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      user.role?.toLowerCase().includes('admin') ? 'default' : 
-                      user.role?.toLowerCase().includes('editor') ? 'secondary' : 
-                      'outline'
-                    }>
-                      {user.global_role ?? user.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getUserStatus(user).variant}>
-                      {getUserStatus(user).label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{renderBrandIcons(user)}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{user.company || '-'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{user.job_title || '-'}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{formatDate(user.last_sign_in_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
-                          <span className="sr-only">Open menu</span>
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {(!user.last_sign_in_at || user.user_status === 'expired') && (
-                          <DropdownMenuItem
-                            onClick={() => handleResendInvite(user.id, user.email)}
-                            disabled={resendingInviteToUserId === user.id}
-                          >
-                            <Mail className="mr-2 h-4 w-4" />
-                            {resendingInviteToUserId === user.id ? 'Sending...' : 
-                              (user.user_status === 'expired' ? 'Resend Expired Invite' : 'Resend Invite')
-                            }
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/users/${user.id}/edit`}>
-                            <Pencil className="mr-2 h-4 w-4" /> Edit User
-                          </Link>
-                        </DropdownMenuItem>
-                        {user.user_status === 'inactive' ? (
-                          <DropdownMenuItem
-                            onClick={() => handleReactivateUser(user.id)}
-                            className="text-green-600"
-                          >
-                            <Users2 className="mr-2 h-4 w-4" /> Reactivate User
-                          </DropdownMenuItem>
+                    <TableCell>
+                      <Avatar className="h-8 w-8">
+                        {getAvatarUrl(user.id, user.avatar_url) ? (
+                          <AvatarImage src={getAvatarUrl(user.id, user.avatar_url)} alt={user.full_name || 'User'} />
                         ) : (
-                          <DropdownMenuItem
-                            onClick={() => setUserToDelete(user)}
-                            disabled={isDeleting && userToDelete?.id === user.id}
-                            className="text-destructive"
-                          >
-                            <UserX className="mr-2 h-4 w-4" /> Deactivate User
-                          </DropdownMenuItem>
+                          <AvatarFallback className="text-xs font-semibold">
+                            {getNameInitials(user.full_name) || (user.full_name || 'U').charAt(0).toUpperCase()}
+                          </AvatarFallback>
                         )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                      </Avatar>
+                    </TableCell>
+                    <TableCell className="font-medium">{user.full_name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        user.role?.toLowerCase().includes('admin') ? 'default' :
+                          user.role?.toLowerCase().includes('editor') ? 'secondary' :
+                            'outline'
+                      }>
+                        {user.global_role ?? user.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getUserStatus(user).variant}>
+                        {getUserStatus(user).label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{renderBrandIcons(user)}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{user.company || '-'}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{user.job_title || '-'}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{formatDate(user.last_sign_in_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
+                            <span className="sr-only">Open menu</span>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {(!user.last_sign_in_at || user.user_status === 'expired') && (
+                            <DropdownMenuItem
+                              onClick={() => handleResendInvite(user.id, user.email)}
+                              disabled={resendingInviteToUserId === user.id}
+                            >
+                              <Mail className="mr-2 h-4 w-4" />
+                              {resendingInviteToUserId === user.id ? 'Sending...' :
+                                (user.user_status === 'expired' ? 'Resend Expired Invite' : 'Resend Invite')
+                              }
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/users/${user.id}/edit`}>
+                              <Pencil className="mr-2 h-4 w-4" /> Edit User
+                            </Link>
+                          </DropdownMenuItem>
+                          {user.user_status === 'inactive' ? (
+                            <DropdownMenuItem
+                              onClick={() => handleReactivateUser(user.id)}
+                              className="text-green-600"
+                            >
+                              <Users2 className="mr-2 h-4 w-4" /> Reactivate User
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => setUserToDelete(user)}
+                              disabled={isDeleting && userToDelete?.id === user.id}
+                              className="text-destructive"
+                            >
+                              <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>
@@ -853,7 +853,7 @@ export default function UsersPage() {
           )}
         </div>
       )}
-      
+
       {/* Deactivate User Confirmation Dialog */}
       <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
         <DialogContent>
@@ -867,15 +867,15 @@ export default function UsersPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setUserToDelete(null)}
               disabled={isDeleting}
             >
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDeactivateUser}
               disabled={isDeleting}
             >

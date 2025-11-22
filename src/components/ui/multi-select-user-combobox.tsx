@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api-client';
 
 export interface UserOption {
   id: string;
@@ -67,7 +68,7 @@ export const MultiSelectUserCombobox: React.FC<MultiSelectUserComboboxProps> = (
         }
         setIsLoading(true);
         try {
-          const response = await fetch(`/api/users/search?query=${encodeURIComponent(q)}&limit=10`);
+          const response = await apiFetch(`/api/users/search?query=${encodeURIComponent(q)}&limit=10`);
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Failed to fetch users');

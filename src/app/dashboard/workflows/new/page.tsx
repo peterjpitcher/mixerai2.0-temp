@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus } from 'lucide-react';
 import { debounce } from 'lodash';
 import { cn } from '@/lib/utils';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { apiFetch } from '@/lib/api-client';
 import { useCurrentUser } from '@/hooks/use-common-data';
@@ -135,7 +135,7 @@ export default function NewWorkflowPage() {
     error: currentUserError,
   } = useCurrentUser();
 
-  const [workflow, setWorkflow] = useState<WorkflowData>(() => ({ 
+  const [workflow, setWorkflow] = useState<WorkflowData>(() => ({
     name: '',
     description: '',
     brand_id: '',
@@ -153,7 +153,7 @@ export default function NewWorkflowPage() {
       }
     ]
   }));
-  
+
   const selectedBrandFull = brands.find(b => b.id === workflow.brand_id);
   const selectedTemplate = useMemo(() => {
     if (!workflow.template_id) {
@@ -183,10 +183,10 @@ export default function NewWorkflowPage() {
   const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
   const userSearchControllers = useRef<Record<number, AbortController>>({});
-  
-  
+
+
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
-  
+
   const hasAnyBrandAdminPermission = currentUser?.brand_permissions?.some(p => p.role === 'admin');
 
   const canAccessPage = isGlobalAdmin || hasAnyBrandAdminPermission;
@@ -340,8 +340,8 @@ export default function NewWorkflowPage() {
       return contentTemplates;
     }
     if (isLoadingBrandWorkflows || brandWorkflows.length === 0 && workflow.brand_id) {
-        // If loading or no workflows for the brand yet, all templates are available
-        return contentTemplates;
+      // If loading or no workflows for the brand yet, all templates are available
+      return contentTemplates;
     }
     const usedTemplateIds = new Set(brandWorkflows.map(wf => wf.template_id).filter(Boolean));
     return contentTemplates.filter(template => !usedTemplateIds.has(template.id));
@@ -508,10 +508,10 @@ export default function NewWorkflowPage() {
   };
 
   const handleUpdateBrand = (value: string) => {
-    setWorkflow(prev => ({ 
-        ...prev, 
-        brand_id: value,
-        template_id: null // Reset template when brand changes
+    setWorkflow(prev => ({
+      ...prev,
+      brand_id: value,
+      template_id: null // Reset template when brand changes
     }));
     setSelectedTemplateId('NO_TEMPLATE_SELECTED'); // Reset UI for template dropdown
     setBrandWorkflows([]); // Clear old brand workflows immediately
@@ -612,8 +612,8 @@ export default function NewWorkflowPage() {
         }
       ];
       setAssigneeInputs(prevInputs => [...prevInputs, '']); // Add input state for new step
-      setUserSearchResults(prevResults => ({...prevResults, [newSteps.length -1]: []})); // Init search results for new step
-      
+      setUserSearchResults(prevResults => ({ ...prevResults, [newSteps.length - 1]: [] })); // Init search results for new step
+
       // Scroll to the new step after it's added
       setTimeout(() => {
         const newStepElement = document.getElementById(`step-${newStepId}`);
@@ -621,7 +621,7 @@ export default function NewWorkflowPage() {
           newStepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);
-      
+
       return { ...prevWorkflow, steps: newSteps };
     });
   };
@@ -631,7 +631,7 @@ export default function NewWorkflowPage() {
       const newSteps = prevWorkflow.steps.filter((_, i) => i !== index);
       setAssigneeInputs(prevInputs => prevInputs.filter((_, i) => i !== index));
       setUserSearchResults(prevResults => {
-        const newResults = {...prevResults};
+        const newResults = { ...prevResults };
         delete newResults[index];
         // Adjust keys for subsequent steps if necessary, though usually direct key removal is fine
         // if keys are simply step indices. If other logic relies on a contiguous sequence of keys,
@@ -647,16 +647,16 @@ export default function NewWorkflowPage() {
     setWorkflow(prevWorkflow => {
       const newSteps = [...prevWorkflow.steps];
       [newSteps[index - 1], newSteps[index]] = [newSteps[index], newSteps[index - 1]];
-      
+
       setAssigneeInputs(prevInputs => {
         const newInputs = [...prevInputs];
         [newInputs[index - 1], newInputs[index]] = [newInputs[index], newInputs[index - 1]];
         return newInputs;
       });
       setUserSearchResults(prevResults => {
-        const newResults = {...prevResults};
-        const temp = newResults[index-1];
-        newResults[index-1] = newResults[index];
+        const newResults = { ...prevResults };
+        const temp = newResults[index - 1];
+        newResults[index - 1] = newResults[index];
         newResults[index] = temp;
         return newResults;
       });
@@ -676,9 +676,9 @@ export default function NewWorkflowPage() {
         return newInputs;
       });
       setUserSearchResults(prevResults => {
-        const newResults = {...prevResults};
-        const temp = newResults[index+1];
-        newResults[index+1] = newResults[index];
+        const newResults = { ...prevResults };
+        const temp = newResults[index + 1];
+        newResults[index + 1] = newResults[index];
         newResults[index] = temp;
         return newResults;
       });
@@ -795,7 +795,7 @@ export default function NewWorkflowPage() {
   }
 
   if (!canAccessPage) {
-     return (
+    return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
         <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
@@ -823,17 +823,17 @@ export default function NewWorkflowPage() {
   return (
     <div className="space-y-6 pb-20">
       <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        { label: "Workflows", href: "/dashboard/workflows" }, 
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Workflows", href: "/dashboard/workflows" },
         { label: "New" }
       ]} />
 
       <div className="flex items-center justify-between mb-2">
-         <div className="flex items-center gap-3">
-           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/workflows')} aria-label="Back to Workflows">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/workflows')} aria-label="Back to Workflows">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          {selectedBrandFull && 
+          {selectedBrandFull &&
             <BrandIcon
               name={selectedBrandFull.name}
               color={selectedBrandFull.color ?? selectedBrandFull.brand_color ?? undefined}
@@ -851,7 +851,7 @@ export default function NewWorkflowPage() {
           </div>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
@@ -873,7 +873,7 @@ export default function NewWorkflowPage() {
                   Updates automatically based on the selected brand and content template.
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select value={workflow.status} onValueChange={handleUpdateWorkflowStatus}>
@@ -886,7 +886,7 @@ export default function NewWorkflowPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand <span className="text-destructive">*</span></Label>
                 <Select value={workflow.brand_id} onValueChange={handleUpdateBrand} disabled={brands.length === 0 && !isGlobalAdmin}>
@@ -915,15 +915,15 @@ export default function NewWorkflowPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                 {brands.length === 0 && isGlobalAdmin && (
+                {brands.length === 0 && isGlobalAdmin && (
                   <p className="text-xs text-muted-foreground">No brands found. <Link href="/dashboard/brands/new" className="underline">Create one?</Link></p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="contentTemplate">Content Template <span className="text-destructive">*</span></Label>
-                <Select 
-                  value={selectedTemplateId} 
+                <Select
+                  value={selectedTemplateId}
                   onValueChange={handleUpdateTemplate}
                   disabled={!workflow.brand_id || isLoadingBrandWorkflows}
                 >
@@ -943,9 +943,9 @@ export default function NewWorkflowPage() {
                       ))
                     )}
                     {workflow.brand_id && !isLoadingBrandWorkflows && availableContentTemplates.length === 0 && contentTemplates.length > 0 && (
-                        <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-                            All templates are in use for this brand.
-                        </div>
+                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                        All templates are in use for this brand.
+                      </div>
                     )}
                   </SelectContent>
                 </Select>
@@ -967,7 +967,7 @@ export default function NewWorkflowPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -1048,7 +1048,7 @@ export default function NewWorkflowPage() {
                     {/* Step Description */}
                     <div className="mb-4 space-y-2">
                       <Label htmlFor={`step-description-${index}`} className="text-sm font-medium">Step Description</Label>
-                       <div className="relative">
+                      <div className="relative">
                         <Textarea
                           id={`step-description-${index}`}
                           value={step.description}
@@ -1058,18 +1058,18 @@ export default function NewWorkflowPage() {
                           className="pr-28" // Add padding to the right for the button
                         />
                         <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleGenerateStepDescription(index)}
-                            disabled={stepDescLoading[index]}
-                            className="absolute bottom-2 right-2"
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateStepDescription(index)}
+                          disabled={stepDescLoading[index]}
+                          className="absolute bottom-2 right-2"
                         >
-                            {stepDescLoading[index] ? (
-                                <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating...</>
-                            ) : (
-                                <>✨ Auto-Generate</>
-                            )}
+                          {stepDescLoading[index] ? (
+                            <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating...</>
+                          ) : (
+                            <>✨ Auto-Generate</>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -1101,78 +1101,78 @@ export default function NewWorkflowPage() {
                         </p>
                       </div>
                     </div>
-                    
+
                     {/* Assignees Section */}
                     <div className="space-y-3">
-                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users <span className="text-destructive">*</span></Label>
-                        <div className="flex items-center gap-2">
-                            <Input
-                                id={`assignee-input-${index}`}
-                                type="text"
-                                placeholder="Enter email or search by name/email"
-                                value={assigneeInputs[index] || ''}
-                                onChange={(e) => handleAssigneeInputChange(index, e.target.value)}
-                                className="flex-grow"
-                            />
-                            <Button 
-                                type="button" 
-                                onClick={() => handleAddEmailAsAssignee(index)}
-                                disabled={!assigneeInputs[index]?.trim() || !assigneeInputs[index]?.includes('@')}
-                                variant="outline"
-                            >
-                                <UserPlus className="mr-2 h-4"/> Add Email
-                            </Button>
+                      <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users <span className="text-destructive">*</span></Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id={`assignee-input-${index}`}
+                          type="text"
+                          placeholder="Enter email or search by name/email"
+                          value={assigneeInputs[index] || ''}
+                          onChange={(e) => handleAssigneeInputChange(index, e.target.value)}
+                          className="flex-grow"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleAddEmailAsAssignee(index)}
+                          disabled={!assigneeInputs[index]?.trim() || !assigneeInputs[index]?.includes('@')}
+                          variant="outline"
+                        >
+                          <UserPlus className="mr-2 h-4" /> Add Email
+                        </Button>
+                      </div>
+
+                      {/* User Search Results */}
+                      {userSearchLoading[index] && <div className="text-sm text-muted-foreground py-2"><Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />Searching users...</div>}
+                      {userSearchResults[index] && userSearchResults[index].length > 0 && (
+                        <Card className="mt-2 max-h-48 overflow-y-auto">
+                          <CardContent className="p-2 space-y-1">
+                            {userSearchResults[index].map((user) => (
+                              <button
+                                key={user.id}
+                                type="button"
+                                onClick={() => handleAddUserToStep(index, user)}
+                                className="w-full text-left p-2 hover:bg-accent rounded-md text-sm flex items-center justify-between"
+                              >
+                                <span>{user.full_name || user.email} {user.full_name && user.email && `(${user.email})`}</span>
+                                <Plus className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+                      {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >= 2 && (
+                        <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
+                      )}
+
+
+                      {/* Added Assignees Badges */}
+                      {step.assignees.length > 0 ? (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs text-muted-foreground">Assigned:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {step.assignees.map((assignee) => (
+                              <Badge key={assignee.id} variant="secondary" className="pl-2 text-sm">
+                                {assignee.full_name || assignee.email}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveUserFromStep(index, assignee.id)}
+                                  className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/20 text-destructive"
+                                  aria-label={`Remove ${assignee.full_name || assignee.email}`}
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-
-                        {/* User Search Results */}
-                        {userSearchLoading[index] && <div className="text-sm text-muted-foreground py-2"><Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />Searching users...</div>}
-                        {userSearchResults[index] && userSearchResults[index].length > 0 && (
-                            <Card className="mt-2 max-h-48 overflow-y-auto">
-                                <CardContent className="p-2 space-y-1">
-                                    {userSearchResults[index].map((user) => (
-                                        <button
-                                            key={user.id}
-                                            type="button"
-                                            onClick={() => handleAddUserToStep(index, user)}
-                                            className="w-full text-left p-2 hover:bg-accent rounded-md text-sm flex items-center justify-between"
-                                        >
-                                          <span>{user.full_name || user.email} {user.full_name && user.email && `(${user.email})`}</span>
-                                          <Plus className="h-4 w-4 text-muted-foreground" />
-                                        </button>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        )}
-                        {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >=2 && (
-                             <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
-                        )}
-
-
-                        {/* Added Assignees Badges */}
-                        {step.assignees.length > 0 ? (
-                            <div className="mt-2 space-y-1">
-                                <p className="text-xs text-muted-foreground">Assigned:</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {step.assignees.map((assignee) => (
-                                        <Badge key={assignee.id} variant="secondary" className="pl-2 text-sm">
-                                            {assignee.full_name || assignee.email}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveUserFromStep(index, assignee.id)}
-                                                className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/20 text-destructive"
-                                                aria-label={`Remove ${assignee.full_name || assignee.email}`}
-                                            >
-                                                <XCircle className="h-3.5 w-3.5" />
-                                            </button>
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="mt-2 p-3 border border-destructive/50 rounded-md bg-destructive/10">
-                                <p className="text-sm text-destructive">No assignees added. At least one assignee is required for this step.</p>
-                            </div>
-                        )}
+                      ) : (
+                        <div className="mt-2 p-3 border border-destructive/50 rounded-md bg-destructive/10">
+                          <p className="text-sm text-destructive">No assignees added. At least one assignee is required for this step.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1184,7 +1184,7 @@ export default function NewWorkflowPage() {
 
       <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background py-4 px-4 -mx-4 z-10 border-t border-border">
         <Button variant="outline" onClick={() => router.push('/dashboard/workflows')} disabled={isSaving}>
-            Cancel
+          Cancel
         </Button>
         <Button onClick={handleCreateWorkflow} disabled={isSaving || isLoading}>
           {isSaving ? (
@@ -1194,7 +1194,7 @@ export default function NewWorkflowPage() {
           )}
         </Button>
       </div>
-      
+
     </div>
   );
 } 

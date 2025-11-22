@@ -17,9 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus, Info } from 'lucide-react'; // Added Info
 import { debounce } from 'lodash';
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { ActiveBrandIndicator } from '@/components/ui/active-brand-indicator';
 import { apiFetch } from '@/lib/api-client';
 import { useCurrentUser } from '@/hooks/use-common-data';
@@ -55,7 +55,7 @@ interface UserOption {
 }
 
 interface WorkflowStepDefinition {
-  id: string; 
+  id: string;
   name: string;
   description: string;
   role: string;
@@ -80,7 +80,7 @@ interface WorkflowFull {
   content_count?: number;
 }
 
-interface WorkflowSummary { 
+interface WorkflowSummary {
   id: string;
   template_id?: string | null;
 }
@@ -163,7 +163,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
-  
+
   const {
     data: currentUser,
     isLoading: isLoadingUser,
@@ -289,13 +289,13 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
 
         const processedWorkflow = isDuplicatedWorkflow
           ? {
-              ...workflowData.workflow,
-              steps: mapStepsWithRequirements(workflowData.workflow.steps),
-            }
+            ...workflowData.workflow,
+            steps: mapStepsWithRequirements(workflowData.workflow.steps),
+          }
           : {
-              ...workflowData.workflow,
-              steps: mapStepsWithRequirements(workflowData.workflow.steps),
-            };
+            ...workflowData.workflow,
+            steps: mapStepsWithRequirements(workflowData.workflow.steps),
+          };
 
         setWorkflow(processedWorkflow);
         setSelectedTemplateId(processedWorkflow?.template_id || 'NO_TEMPLATE_SELECTED');
@@ -307,11 +307,11 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
             : 'Current Template';
         const fallbackTemplateOption: ContentTemplateSummary[] = processedWorkflow?.template_id
           ? [
-              {
-                id: processedWorkflow.template_id,
-                name: fallbackTemplateName,
-              },
-            ]
+            {
+              id: processedWorkflow.template_id,
+              name: fallbackTemplateName,
+            },
+          ]
           : [];
         if (fallbackTemplateOption.length > 0) {
           setContentTemplates(fallbackTemplateOption);
@@ -459,8 +459,8 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     const usedTemplateIdsByOtherWorkflows = new Set(
       otherBrandWorkflows.map(wf => wf.template_id).filter(Boolean)
     );
-    return contentTemplates.filter(template => 
-      template.id === currentWorkflowTemplateId || 
+    return contentTemplates.filter(template =>
+      template.id === currentWorkflowTemplateId ||
       !usedTemplateIdsByOtherWorkflows.has(template.id)
     );
   }, [contentTemplates, otherBrandWorkflows, workflow?.template_id, workflow?.brand_id, isLoadingBrandWorkflows]);
@@ -718,14 +718,14 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     if (!workflow || !workflow.steps || !workflow.steps[index]) {
       toast.error('Step data not available.');
       return;
-            }
+    }
     const step = workflow.steps[index];
     if (!step.name || !step.role) {
       toast.error('Step name and role are required to generate a description.');
-        return;
-      }
+      return;
+    }
     setStepDescLoading(prev => ({ ...prev, [index]: true }));
-      try {
+    try {
       const currentBrand = allFetchedBrands.find(b => b.id === workflow.brand_id);
       const currentTemplate = contentTemplates.find(ct => ct.id === selectedTemplateId);
       const response = await apiFetch('/api/ai/generate-step-description', {
@@ -748,15 +748,15 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       if (data.success && data.description) {
         handleUpdateStepDescription(index, data.description);
         toast.success('Step description generated!');
-        } else {
+      } else {
         throw new Error(data.error || 'AI service did not return a description.');
-        }
+      }
     } catch (error) {
       console.error('Error generating step description:', error);
       toast.error((error as Error).message || 'Could not generate step description.');
-      } finally {
+    } finally {
       setStepDescLoading(prev => ({ ...prev, [index]: false }));
-      }
+    }
   };
 
   const handleAddStep = () => {
@@ -777,8 +777,8 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         }
       ];
       setAssigneeInputs(prevInputs => [...prevInputs, '']);
-      setUserSearchResults(prevResults => ({...prevResults, [newSteps.length -1]: []}));
-      
+      setUserSearchResults(prevResults => ({ ...prevResults, [newSteps.length - 1]: [] }));
+
       // Scroll to the new step after it's added
       setTimeout(() => {
         const newStepElement = document.getElementById(`step-${newStepId}`);
@@ -786,7 +786,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           newStepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);
-      
+
       return { ...prevWorkflow, steps: newSteps };
     });
   };
@@ -801,7 +801,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       const newSteps = prevWorkflow.steps.filter((_, i) => i !== index);
       setAssigneeInputs(prevInputs => prevInputs.filter((_, i) => i !== index));
       setUserSearchResults(prevResults => {
-        const newResults = {...prevResults};
+        const newResults = { ...prevResults };
         delete newResults[index];
         return newResults;
       });
@@ -821,9 +821,9 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         return newInputs;
       });
       setUserSearchResults(prevResults => {
-        const newResults = {...prevResults};
-        const temp = newResults[index-1];
-        newResults[index-1] = newResults[index];
+        const newResults = { ...prevResults };
+        const temp = newResults[index - 1];
+        newResults[index - 1] = newResults[index];
         newResults[index] = temp;
         return newResults;
       });
@@ -844,9 +844,9 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         return newInputs;
       });
       setUserSearchResults(prevResults => {
-        const newResults = {...prevResults};
-        const temp = newResults[index+1];
-        newResults[index+1] = newResults[index];
+        const newResults = { ...prevResults };
+        const temp = newResults[index + 1];
+        newResults[index + 1] = newResults[index];
         newResults[index] = temp;
         return newResults;
       });
@@ -960,10 +960,10 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       steps: stepsPayload,
       updated_at: new Date().toISOString()
     } satisfies Record<string, unknown>;
-      
+
     try {
       let response;
-      
+
       if (isDuplicated) {
         // When working with a duplicated workflow we update the duplicate shell that was created on the server
         response = await apiFetch(`/api/workflows/${id}`, {
@@ -989,7 +989,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         }
         toast.success('Workflow updated successfully!');
       }
-      
+
       router.push('/dashboard/workflows');
     } catch (error) {
       console.error('Error saving workflow:', error);
@@ -1022,7 +1022,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       setIsDeleting(false);
     }
   };
-  
+
   if (isLoadingUser) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
@@ -1071,7 +1071,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       </div>
     );
   }
-  
+
   if (!workflow) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
@@ -1111,15 +1111,15 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   return (
     <div className="space-y-6 pb-20">
       <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        { label: "Workflows", href: "/dashboard/workflows" }, 
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Workflows", href: "/dashboard/workflows" },
         { label: workflow.name || "Loading...", href: isDuplicated ? undefined : `/dashboard/workflows/${id}` },
         { label: isDuplicated ? "Create" : "Edit" }
       ]} />
 
-      <Button 
-        variant="ghost" 
-        size="sm" 
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => router.push('/dashboard/workflows')}
         className="mb-4"
       >
@@ -1139,7 +1139,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
 
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
-          {currentBrandForDisplay && 
+          {currentBrandForDisplay &&
             <BrandIcon
               name={currentBrandForDisplay.name}
               color={currentBrandForDisplay.color ?? currentBrandForDisplay.brand_color ?? undefined}
@@ -1158,7 +1158,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         </div>
         {!isDuplicated && (
           <div className="flex flex-col items-end space-y-1">
-            <Button 
+            <Button
               variant="destructive"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting || isSaving}
@@ -1174,7 +1174,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           </div>
         )}
       </div>
-      
+
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
@@ -1197,7 +1197,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                   Updates automatically based on the selected brand and content template.
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select value={workflow.status || ''} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
@@ -1211,7 +1211,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
                 <Select value={workflow.brand_id || ''} onValueChange={handleUpdateBrand} disabled={!canEditThisWorkflow || (brands.length === 0 && !isGlobalAdmin)}>
@@ -1235,16 +1235,16 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                     ))}
                   </SelectContent>
                 </Select>
-                 {brands.length === 0 && isGlobalAdmin && (
+                {brands.length === 0 && isGlobalAdmin && (
                   <p className="text-xs text-muted-foreground">No brands found. <Link href="/dashboard/brands/new" className="underline">Create one?</Link></p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="contentTemplate">Content Template <span className="text-destructive">*</span></Label>
-                <Select 
-                  value={selectedTemplateId || 'NO_TEMPLATE_SELECTED'} 
-                  onValueChange={handleUpdateTemplate} 
+                <Select
+                  value={selectedTemplateId || 'NO_TEMPLATE_SELECTED'}
+                  onValueChange={handleUpdateTemplate}
                   disabled={!canEditThisWorkflow || !workflow?.brand_id || isLoadingBrandWorkflows}
                 >
                   <SelectTrigger id="contentTemplate">
@@ -1257,21 +1257,21 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                         {template.name}
                       </SelectItem>
                     ))}
-                     {workflow?.brand_id && !isLoadingBrandWorkflows && availableContentTemplates.length === 0 && contentTemplates.length > 0 && (
-                        <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-                            All templates are in use for this brand, or no templates available.
-                        </div>
+                    {workflow?.brand_id && !isLoadingBrandWorkflows && availableContentTemplates.length === 0 && contentTemplates.length > 0 && (
+                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                        All templates are in use for this brand, or no templates available.
+                      </div>
                     )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground flex items-center">
-                 <Info className="h-3 w-3 mr-1 shrink-0" /> Link this workflow to a template.
+                  <Info className="h-3 w-3 mr-1 shrink-0" /> Link this workflow to a template.
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -1308,76 +1308,76 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                             className="text-base font-medium flex-grow"
                             disabled={!canEditThisWorkflow}
                           />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleMoveStepUp(index)}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMoveStepUp(index)}
                             disabled={index === 0 || !canEditThisWorkflow}
                             aria-label="Move step up"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleMoveStepDown(index)}
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMoveStepDown(index)}
                             disabled={index === workflow.steps.length - 1 || !canEditThisWorkflow}
                             aria-label="Move step down"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveStep(index)}
-                          className="text-destructive hover:text-destructive/90"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveStep(index)}
+                            className="text-destructive hover:text-destructive/90"
                             aria-label="Remove step"
-                            disabled={!canEditThisWorkflow || workflow.steps.length <=1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                            disabled={!canEditThisWorkflow || workflow.steps.length <= 1}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                        </div>
-                        
+
                     <div className="mb-4">
                       <Label className="text-sm font-medium mb-2 block">Assigned Role</Label>
-                          <RoleSelectionCards 
+                      <RoleSelectionCards
                         selectedRole={step.role}
                         onRoleSelect={(roleId) => handleUpdateStepRole(index, roleId)}
-                            disabled={!canEditThisWorkflow}
-                          />
-                      </div>
-                      
+                        disabled={!canEditThisWorkflow}
+                      />
+                    </div>
+
                     <div className="mb-4 space-y-2">
                       <Label htmlFor={`step-description-${index}`} className="text-sm font-medium">Step Description</Label>
-                       <div className="relative">
+                      <div className="relative">
                         <Textarea
                           id={`step-description-${index}`}
                           value={step.description}
                           onChange={(e) => handleUpdateStepDescription(index, e.target.value)}
                           placeholder="Describe the purpose or actions for this step..."
                           rows={3}
-                          className="pr-32" 
+                          className="pr-32"
                           disabled={!canEditThisWorkflow}
                         />
-                          <Button 
-                             type="button" 
-                             variant="outline" 
-                             size="sm" 
-                             onClick={() => handleGenerateStepDescription(index)}
-                            disabled={stepDescLoading[index] || !step.name || !step.role || !canEditThisWorkflow}
-                            className="absolute bottom-2 right-2"
-                           >
-                            {stepDescLoading[index] ? (
-                                <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating...</>
-                            ) : (
-                                <>✨ Auto-Generate</>
-                            )}
-                          </Button>
-                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateStepDescription(index)}
+                          disabled={stepDescLoading[index] || !step.name || !step.role || !canEditThisWorkflow}
+                          className="absolute bottom-2 right-2"
+                        >
+                          {stepDescLoading[index] ? (
+                            <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating...</>
+                          ) : (
+                            <>✨ Auto-Generate</>
+                          )}
+                        </Button>
                       </div>
-                      
+                    </div>
+
                     <div className="flex items-center space-x-2 mb-4">
                       <Switch
                         id={`approval-required-${index}`}
@@ -1406,77 +1406,77 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                         </p>
                       </div>
                     </div>
-                      
+
                     <div className="space-y-3">
-                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users <span className="text-destructive">*</span></Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                                id={`assignee-input-${index}`}
-                                type="text"
-                                placeholder="Enter email or search by name/email"
-                            value={assigneeInputs[index] || ''}
-                                onChange={(e) => handleAssigneeInputChange(index, e.target.value)}
-                                className="flex-grow"
-                            disabled={!canEditThisWorkflow}
-                          />
-                          <Button 
-                                type="button" 
-                                onClick={() => handleAddEmailAsAssignee(index)}
-                                disabled={!canEditThisWorkflow || !assigneeInputs[index]?.trim() || !assigneeInputs[index]?.includes('@')}
-                            variant="outline" 
-                          >
-                                <UserPlus className="mr-2 h-4"/> Add Email
-                          </Button>
-                        </div>
+                      <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users <span className="text-destructive">*</span></Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id={`assignee-input-${index}`}
+                          type="text"
+                          placeholder="Enter email or search by name/email"
+                          value={assigneeInputs[index] || ''}
+                          onChange={(e) => handleAssigneeInputChange(index, e.target.value)}
+                          className="flex-grow"
+                          disabled={!canEditThisWorkflow}
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleAddEmailAsAssignee(index)}
+                          disabled={!canEditThisWorkflow || !assigneeInputs[index]?.trim() || !assigneeInputs[index]?.includes('@')}
+                          variant="outline"
+                        >
+                          <UserPlus className="mr-2 h-4" /> Add Email
+                        </Button>
+                      </div>
 
-                        {userSearchLoading[index] && <div className="text-sm text-muted-foreground py-2"><Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />Searching users...</div>}
-                          {userSearchResults[index] && userSearchResults[index].length > 0 && (
-                            <Card className="mt-2 max-h-48 overflow-y-auto">
-                                <CardContent className="p-2 space-y-1">
-                                    {userSearchResults[index].map((user) => (
-                                        <button
-                                  key={user.id}
-                                            type="button"
-                                            onClick={() => handleAddUserToStep(index, user)}
-                                            className="w-full text-left p-2 hover:bg-accent rounded-md text-sm flex items-center justify-between"
-                                            disabled={!canEditThisWorkflow}
-                                >
-                                          <span>{user.full_name || user.email} {user.full_name && user.email && `(${user.email})`}</span>
-                                          <Plus className="h-4 w-4 text-muted-foreground" />
-                                        </button>
-                              ))}
-                                </CardContent>
-                            </Card>
-                          )}
-                        {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >=2 && (
-                             <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
-                        )}
+                      {userSearchLoading[index] && <div className="text-sm text-muted-foreground py-2"><Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />Searching users...</div>}
+                      {userSearchResults[index] && userSearchResults[index].length > 0 && (
+                        <Card className="mt-2 max-h-48 overflow-y-auto">
+                          <CardContent className="p-2 space-y-1">
+                            {userSearchResults[index].map((user) => (
+                              <button
+                                key={user.id}
+                                type="button"
+                                onClick={() => handleAddUserToStep(index, user)}
+                                className="w-full text-left p-2 hover:bg-accent rounded-md text-sm flex items-center justify-between"
+                                disabled={!canEditThisWorkflow}
+                              >
+                                <span>{user.full_name || user.email} {user.full_name && user.email && `(${user.email})`}</span>
+                                <Plus className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+                      {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >= 2 && (
+                        <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
+                      )}
 
-                        {step.assignees.length > 0 ? (
-                            <div className="mt-2 space-y-1">
-                                <p className="text-xs text-muted-foreground">Assigned:</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {step.assignees.map((assignee) => (
-                                        <Badge key={assignee.id || assignee.email} variant="secondary" className="pl-2 text-sm">
-                                            {assignee.full_name || assignee.email}
+                      {step.assignees.length > 0 ? (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs text-muted-foreground">Assigned:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {step.assignees.map((assignee) => (
+                              <Badge key={assignee.id || assignee.email} variant="secondary" className="pl-2 text-sm">
+                                {assignee.full_name || assignee.email}
                                 <button
                                   type="button"
-                                                onClick={() => handleRemoveUserFromStep(index, assignee.id || assignee.email!)}
-                                                className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/20 text-destructive"
-                                                aria-label={`Remove ${assignee.full_name || assignee.email}`}
-                                                disabled={!canEditThisWorkflow}
+                                  onClick={() => handleRemoveUserFromStep(index, assignee.id || assignee.email!)}
+                                  className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/20 text-destructive"
+                                  aria-label={`Remove ${assignee.full_name || assignee.email}`}
+                                  disabled={!canEditThisWorkflow}
                                 >
-                                                <XCircle className="h-3.5 w-3.5" />
+                                  <XCircle className="h-3.5 w-3.5" />
                                 </button>
                               </Badge>
-                                    ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                        ) : (
-                            <div className="mt-2 p-3 border border-destructive/50 rounded-md bg-destructive/10">
-                                <p className="text-sm text-destructive">No assignees added. At least one assignee is required for this step.</p>
-                            </div>
-                        )}
+                      ) : (
+                        <div className="mt-2 p-3 border border-destructive/50 rounded-md bg-destructive/10">
+                          <p className="text-sm text-destructive">No assignees added. At least one assignee is required for this step.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1497,14 +1497,14 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
 
       <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background py-4 px-4 -mx-4 z-10 border-t border-border">
         <Button variant="outline" onClick={() => router.push('/dashboard/workflows')} disabled={isSaving || isDeleting}>
-            Cancel
+          Cancel
         </Button>
         <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting || !canEditThisWorkflow}>
-            {isSaving ? (
+          {isSaving ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isDuplicated ? 'Creating...' : 'Saving...'}</>
-            ) : (
-              isDuplicated ? 'Create Workflow' : 'Save Changes'
-            )}
+          ) : (
+            isDuplicated ? 'Create Workflow' : 'Save Changes'
+          )}
         </Button>
       </div>
     </div>

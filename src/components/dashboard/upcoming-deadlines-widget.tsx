@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DueDateIndicator } from '@/components/ui/due-date-indicator';
 import { BrandDisplay } from '@/components/ui/brand-display';
+import { apiFetch } from '@/lib/api-client';
 
 interface ContentWithDeadline {
   id: string;
@@ -43,7 +44,7 @@ export function UpcomingDeadlinesWidget({
         params.append('limit', limit.toString());
         params.append('sort', 'due_date');
 
-        const response = await fetch(`/api/content?${params}`);
+        const response = await apiFetch(`/api/content?${params}`);
         const data = await response.json();
 
         if (data.success) {

@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft, Building2, Package, Sprout, Globe, ShieldCheck, Shi
 import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { apiFetch } from '@/lib/api-client';
 
 interface ClaimDetailPageProps {
   params: {
@@ -75,7 +76,7 @@ export default function ClaimDetailPage({ params }: ClaimDetailPageProps) {
       
       try {
         // Fetch claim details
-        const claimResponse = await fetch(`/api/claims/${id}`);
+        const claimResponse = await apiFetch(`/api/claims/${id}`);
         const claimData = await claimResponse.json();
         
         if (!claimResponse.ok || !claimData.success) {
@@ -86,19 +87,19 @@ export default function ClaimDetailPage({ params }: ClaimDetailPageProps) {
         
         // Fetch related entity details based on claim level
         if (claimData.data.level === 'brand' && claimData.data.master_brand_id) {
-          const brandResponse = await fetch(`/api/master-claim-brands/${claimData.data.master_brand_id}`);
+          const brandResponse = await apiFetch(`/api/master-claim-brands/${claimData.data.master_brand_id}`);
           const brandData = await brandResponse.json();
           if (brandData.success) {
             setRelatedEntity({ ...brandData.data, type: 'brand' });
           }
         } else if (claimData.data.level === 'product' && claimData.data.product_id) {
-          const productResponse = await fetch(`/api/products/${claimData.data.product_id}`);
+          const productResponse = await apiFetch(`/api/products/${claimData.data.product_id}`);
           const productData = await productResponse.json();
           if (productData.success) {
             setRelatedEntity({ ...productData.data, type: 'product' });
           }
         } else if (claimData.data.level === 'ingredient' && claimData.data.ingredient_id) {
-          const ingredientResponse = await fetch(`/api/ingredients/${claimData.data.ingredient_id}`);
+          const ingredientResponse = await apiFetch(`/api/ingredients/${claimData.data.ingredient_id}`);
           const ingredientData = await ingredientResponse.json();
           if (ingredientData.success) {
             setRelatedEntity({ ...ingredientData.data, type: 'ingredient' });

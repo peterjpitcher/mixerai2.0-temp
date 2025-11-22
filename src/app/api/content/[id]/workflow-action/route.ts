@@ -6,6 +6,7 @@ import { User } from '@supabase/supabase-js';
 // import { TablesUpdate, TablesInsert } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 // import { executeTransaction } from '@/lib/db/transactions';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { sendNotificationEmail } from '@/lib/notifications/send-notification-email';
 
 export const dynamic = "force-dynamic";
 
@@ -494,25 +495,13 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         
       if (content) {
         // Send notification to content creator about the action
-        const protocol = request.headers.get('x-forwarded-proto') || 'https';
-        const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
-        const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        
-        await fetch(`${baseUrl}/api/notifications/email`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': request.headers.get('authorization') || '',
-            'x-csrf-token': request.headers.get('x-csrf-token') || '',
-            'Cookie': request.headers.get('cookie') || ''
-          },
-          body: JSON.stringify({
-            type: 'workflow_action',
-            userId: content.created_by,
-            contentId: contentId,
-            action: action,
-            feedback: feedback
-          })
+        await sendNotificationEmail({
+          type: 'workflow_action',
+          userId: content.created_by || undefined,
+          contentId: contentId,
+          action: action === 'approve' ? 'approved' : 'rejected',
+          feedback: feedback,
+          requestUser: user, // Pass the requestUser for context if needed inside the utility
         });
         
         // If approved and moved to next step, send notifications to new assignees
@@ -542,20 +531,12 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
               
             if (newTask) {
               // Send email notification for the task
-              await fetch(`${baseUrl}/api/notifications/email`, {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'Authorization': request.headers.get('authorization') || '',
-                  'x-csrf-token': request.headers.get('x-csrf-token') || '',
-                  'Cookie': request.headers.get('cookie') || ''
-                },
-                body: JSON.stringify({
-                  type: 'task_assignment',
-                  userId: assigneeId,
-                  taskId: newTask.id,
-                  contentId: contentId
-                })
+              await sendNotificationEmail({
+                type: 'task_assignment',
+                userId: assigneeId,
+                taskId: newTask.id,
+                contentId: contentId,
+                requestUser: user, // Pass the requestUser for context if needed inside the utility
               });
             }
             }

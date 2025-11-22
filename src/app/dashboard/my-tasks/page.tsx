@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Edit, AlertCircle, ListChecks, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils/date';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { TableSkeleton } from '@/components/ui/loading-skeletons';
 import { DueDateIndicator } from '@/components/ui/due-date-indicator';
@@ -19,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useDebounce } from '@/lib/hooks/use-debounce';
+import { useDebounce } from '@/hooks/use-debounce';
 import { mapContentStatusToDueDateStatus } from './utils';
+import { apiFetch } from '@/lib/api-client';
 
 // TaskItem interface for the page - this should match the output of /api/me/tasks
 interface TaskItem {
@@ -105,7 +106,7 @@ export default function MyTasksPage() {
       }
 
       try {
-        const response = await fetch(`/api/me/tasks?${params.toString()}`, {
+        const response = await apiFetch(`/api/me/tasks?${params.toString()}`, {
           method: 'GET',
           cache: 'no-store',
           headers: {
@@ -384,7 +385,7 @@ export default function MyTasksPage() {
                     <tr key={task.id} className="border-b hover:bg-muted/50">
                       <td className="p-3 font-medium">
                         <Link href={`/dashboard/content/${task.content_id}/edit`} className="hover:underline">
-                            {task.content_title || 'Untitled Content'}
+                          {task.content_title || 'Untitled Content'}
                         </Link>
                       </td>
                       <td className="p-3">
@@ -395,8 +396,8 @@ export default function MyTasksPage() {
                       </td>
                       <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
                       <td className="p-3">
-                        <DueDateIndicator 
-                          dueDate={task.due_date} 
+                        <DueDateIndicator
+                          dueDate={task.due_date}
                           status={mapContentStatusToDueDateStatus(task.content_status)}
                           size="sm"
                         />
@@ -405,9 +406,9 @@ export default function MyTasksPage() {
                       <td className="p-3 text-muted-foreground">{task.created_at ? formatDate(task.created_at) : 'N/A'}</td>
                       <td className="p-3">
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={`/dashboard/content/${task.content_id}/edit`} className="flex items-center">
-                                <Edit className="mr-1 h-3.5 w-3.5" /> Edit Content
-                            </Link>
+                          <Link href={`/dashboard/content/${task.content_id}/edit`} className="flex items-center">
+                            <Edit className="mr-1 h-3.5 w-3.5" /> Edit Content
+                          </Link>
                         </Button>
                       </td>
                     </tr>

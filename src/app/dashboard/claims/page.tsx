@@ -40,6 +40,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PRODUCT_CLAIMS_DEPRECATION_MESSAGE } from '@/lib/constants/claims';
 import { logError } from '@/lib/logger';
+import { apiFetch } from '@/lib/api-client';
 
 // Types from API definitions
 type ClaimTypeEnum = 'allowed' | 'disallowed';
@@ -277,10 +278,10 @@ export default function ClaimsPage() {
       try {
         // Paginated fetch; additional lists fetched with larger limits
         const [claimsRes, brandsRes, productsRes, ingredientsRes] = await Promise.all([
-          fetch(`/api/claims?limit=${pageSize}&page=${page}&includeProductNames=true&includeMasterBrandName=true&includeIngredientName=true`),
-          fetch('/api/master-claim-brands'),
-          fetch('/api/products?limit=1000'),
-          fetch('/api/ingredients'),
+          apiFetch(`/api/claims?limit=${pageSize}&page=${page}&includeProductNames=true&includeMasterBrandName=true&includeIngredientName=true`),
+          apiFetch('/api/master-claim-brands'),
+          apiFetch('/api/products?limit=1000'),
+          apiFetch('/api/ingredients'),
         ]);
 
         const claimsData = await claimsRes.json();

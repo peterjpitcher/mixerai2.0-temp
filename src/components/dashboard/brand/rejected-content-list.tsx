@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Eye, AlertCircle, Inbox } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { apiFetch } from '@/lib/api-client';
 
 interface RejectedContentItem {
   id: string;
@@ -33,7 +34,7 @@ export default function RejectedContentList({ brandId }: RejectedContentListProp
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/brands/${brandId}/rejected-content`);
+        const response = await apiFetch(`/api/brands/${brandId}/rejected-content`);
         if (!response.ok) {
           if (response.status === 403) {
             // This can happen if the user is not the brand admin, though the tab shouldn't show.

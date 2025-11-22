@@ -4,15 +4,15 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { CreateContentDropdown } from '@/components/content/create-content-dropdown';
+import { CreateContentDropdown } from '@/components/features/content/create-content-dropdown';
 import { Input } from '@/components/ui/input';
 import { toast as sonnerToast } from "sonner";
 import { formatDate } from '@/lib/utils/date';
-import { useDebounce } from '@/lib/hooks/use-debounce';
+import { useDebounce } from '@/hooks/use-debounce';
 import { useSearchParams } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandDisplay } from '@/components/ui/brand-display'; 
+import { BrandDisplay } from '@/components/ui/brand-display';
 import { FileText, AlertTriangle, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle, MoreVertical, Pencil, ShieldAlert } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { TableSkeleton } from '@/components/ui/loading-skeletons';
@@ -163,7 +163,7 @@ export default function ContentPageClient() {
   });
   const searchParams = useSearchParams();
   const brandIdFromParams = searchParams?.get('brandId');
-  const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string } | null>(null); 
+  const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string } | null>(null);
   const brandCacheRef = useRef<Map<string, { id: string; name: string; brand_color?: string; logo_url?: string }>>(new Map());
   const hasLoadedRef = useRef(false);
   const { data: currentUser } = useCurrentUser();
@@ -204,7 +204,7 @@ export default function ContentPageClient() {
         if (queryString) {
           apiUrl += `?${queryString}`;
         }
-        
+
         const response = await apiFetch(apiUrl, { signal: abortController.signal });
         const payload = await response.json().catch(() => null);
 
@@ -314,7 +314,7 @@ export default function ContentPageClient() {
             brandCacheRef.current.set(brandIdFromParams, data.brand);
             setActiveBrandData(data.brand);
           } else {
-            setActiveBrandData(null); 
+            setActiveBrandData(null);
             console.warn("Could not fetch active brand data for header");
           }
         } catch (err) {
@@ -322,7 +322,7 @@ export default function ContentPageClient() {
           console.warn("Error fetching active brand data:", err);
         }
       } else {
-        setActiveBrandData(null); 
+        setActiveBrandData(null);
       }
     };
     fetchActiveBrand();
@@ -425,7 +425,7 @@ export default function ContentPageClient() {
   const EmptyState = () => (
     <div className="text-center py-12 px-4">
       <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-        <FileText size={40} className="text-primary" strokeWidth={1.5}/>
+        <FileText size={40} className="text-primary" strokeWidth={1.5} />
       </div>
       <h3 className="text-xl font-semibold mb-2">No content found</h3>
       <p className="text-muted-foreground mb-6 max-w-md mx-auto">
@@ -433,13 +433,13 @@ export default function ContentPageClient() {
       </p>
       <div className="space-y-3">
         {statusFilter !== 'all' && (
-          <Button variant="outline" onClick={() => setStatusFilter('all') }>
+          <Button variant="outline" onClick={() => setStatusFilter('all')}>
             <ListFilter size={16} className="mr-2" /> Show All Content
           </Button>
         )}
         <div>
-          <Link 
-            href="/dashboard/help#content" 
+          <Link
+            href="/dashboard/help#content"
             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
           >
             <HelpCircle className="h-4 w-4" />
@@ -453,7 +453,7 @@ export default function ContentPageClient() {
   const ErrorState = () => (
     <div className="text-center py-12 px-4">
       <div className="mx-auto w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
-        <AlertTriangle size={40} className="text-destructive" strokeWidth={1.5}/>
+        <AlertTriangle size={40} className="text-destructive" strokeWidth={1.5} />
       </div>
       <h3 className="text-xl font-semibold mb-2">Failed to load content</h3>
       <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error || "An error occurred while loading your content. Please try again."}</p>
@@ -466,7 +466,7 @@ export default function ContentPageClient() {
   const ForbiddenState = () => (
     <div className="text-center py-12 px-4">
       <div className="mx-auto w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-6">
-        <ShieldAlert size={40} className="text-muted-foreground" strokeWidth={1.5}/>
+        <ShieldAlert size={40} className="text-muted-foreground" strokeWidth={1.5} />
       </div>
       <h3 className="text-xl font-semibold mb-2">You do not have access</h3>
       <p className="text-muted-foreground mb-6 max-w-md mx-auto">
@@ -492,13 +492,13 @@ export default function ContentPageClient() {
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        ...(brandIdFromParams && activeBrandData ? 
+        { label: "Dashboard", href: "/dashboard" },
+        ...(brandIdFromParams && activeBrandData ?
           [
-            { label: "Brands", href: "/dashboard/brands" }, 
+            { label: "Brands", href: "/dashboard/brands" },
             { label: activeBrandData.name || "Brand", href: `/dashboard/brands/${brandIdFromParams}` },
             { label: "Content" }
-          ] : 
+          ] :
           [{ label: "Content" }])
       ]} />
 
@@ -507,14 +507,14 @@ export default function ContentPageClient() {
         description="View, manage, and track all content items across your brands."
         actions={<CreateContentDropdown />}
       />
-      
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="max-w-sm w-full sm:w-auto"><Input placeholder="Search content..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}/></div>
+        <div className="max-w-sm w-full sm:w-auto"><Input placeholder="Search content..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div>
         <div className="flex items-center space-x-2">
           {filterOptions.map(option => (
-            <Button 
-              key={option.value} 
-              variant={statusFilter === option.value ? 'default' : 'outline'} 
+            <Button
+              key={option.value}
+              variant={statusFilter === option.value ? 'default' : 'outline'}
               size="sm"
               onClick={() => setStatusFilter(option.value)}
               className="flex items-center"
@@ -564,16 +564,16 @@ export default function ContentPageClient() {
             <AccordionItem value={brandName} key={brandName} className="border rounded-lg overflow-hidden">
               <AccordionTrigger className="bg-muted hover:bg-muted/90 px-4 py-3">
                 <div className="flex items-center">
-                  {items.length > 0 && 
-                    <BrandDisplay 
+                  {items.length > 0 &&
+                    <BrandDisplay
                       brand={{
                         name: brandName,
                         brand_color: items[0].brand_color,
                         logo_url: items[0].brand_logo_url
                       }}
                       variant="compact"
-                      size="sm" 
-                      className="mr-2" 
+                      size="sm"
+                      className="mr-2"
                     />}
                   <span className="font-semibold text-lg">{brandName} ({items.length})</span>
                 </div>
@@ -601,8 +601,8 @@ export default function ContentPageClient() {
                                 {item.title || 'Untitled Content'}
                               </Link>
                               {item.template_name && <p className="text-xs text-muted-foreground flex items-center mt-1">
-                                  {item.template_icon && <FileText className="mr-1 h-3 w-3 text-muted-foreground" />} 
-                                  {item.template_name}
+                                {item.template_icon && <FileText className="mr-1 h-3 w-3 text-muted-foreground" />}
+                                {item.template_name}
                               </p>}
                             </td>
                             <td className="p-3">{item.current_step_name || 'N/A'}</td>
@@ -652,8 +652,8 @@ export default function ContentPageClient() {
                               )}
                             </td>
                             <td className="p-3 whitespace-nowrap">
-                              <DueDateIndicator 
-                                dueDate={item.due_date || null} 
+                              <DueDateIndicator
+                                dueDate={item.due_date || null}
                                 status={mapStatusToDueDateStatus(item.status)}
                                 size="sm"
                               />
@@ -690,12 +690,12 @@ export default function ContentPageClient() {
                                           </Link>
                                         </DropdownMenuItem>
                                       )}
-                                      <DropdownMenuItem 
-                                        onClick={() => handleDeleteClick(item)} 
+                                      <DropdownMenuItem
+                                        onClick={() => handleDeleteClick(item)}
                                         className="text-destructive"
                                         disabled={isDeleting && itemToDelete?.id === item.id}
                                       >
-                                        <Trash2 className="mr-2 h-4 w-4" /> 
+                                        <Trash2 className="mr-2 h-4 w-4" />
                                         {isDeleting && itemToDelete?.id === item.id ? 'Deleting...' : 'Delete'}
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>

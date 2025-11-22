@@ -100,7 +100,7 @@ export default function MarketOverridesPage() {
     const fetchProducts = async () => {
       setIsLoadingProducts(true);
       try {
-        const response = await fetch('/api/products'); 
+        const response = await apiFetch('/api/products'); 
         if (!response.ok) throw new Error('Failed to fetch products');
         const apiResponse = await response.json();
         if (apiResponse.success && Array.isArray(apiResponse.data)) {
@@ -114,7 +114,7 @@ export default function MarketOverridesPage() {
     const fetchCountries = async () => {
       setIsLoadingCountries(true);
       try {
-        const response = await fetch('/api/countries');
+        const response = await apiFetch('/api/countries');
         if (!response.ok) throw new Error('Failed to fetch countries');
         const apiResponse = await response.json();
         const list = apiResponse.countries || apiResponse.data;
@@ -157,7 +157,7 @@ export default function MarketOverridesPage() {
     queryString += params.join('&');
 
     try {
-      const responseOverrides = await fetch(queryString);
+      const responseOverrides = await apiFetch(queryString);
       if (!responseOverrides.ok) { 
         const errorData = await responseOverrides.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch market overrides');

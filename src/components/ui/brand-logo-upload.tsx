@@ -6,10 +6,10 @@ import { Upload, X, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import Image from 'next/image';
-import { Spinner } from '@/components/spinner';
-import { 
-  validateFile, 
-  validateFileContent, 
+import { Spinner } from '@/components/ui/spinner';
+import {
+  validateFile,
+  validateFileContent,
   validateImageDimensions,
   sanitizeFileName
 } from '@/lib/validation/file-upload';
@@ -22,9 +22,9 @@ interface BrandLogoUploadProps {
   isDisabled?: boolean;
 }
 
-export function BrandLogoUpload({ 
-  currentLogoUrl, 
-  onLogoChange, 
+export function BrandLogoUpload({
+  currentLogoUrl,
+  onLogoChange,
   brandId,
   brandName,
   isDisabled = false
@@ -32,7 +32,7 @@ export function BrandLogoUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentLogoUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -99,10 +99,10 @@ export function BrandLogoUpload({
 
       // Update the preview
       setPreviewUrl(publicUrl);
-      
+
       // Call the parent callback
       onLogoChange(publicUrl);
-      
+
       toast.success('Brand logo uploaded successfully');
     } catch (error) {
       console.error('Error uploading brand logo:', error);
@@ -147,7 +147,7 @@ export function BrandLogoUpload({
             </div>
           )}
         </div>
-        
+
         <div className="flex flex-col gap-2">
           <input
             ref={fileInputRef}
@@ -157,7 +157,7 @@ export function BrandLogoUpload({
             className="hidden"
             disabled={isDisabled || isUploading}
           />
-          
+
           <Button
             type="button"
             variant="outline"
@@ -168,7 +168,7 @@ export function BrandLogoUpload({
             <Upload className="h-4 w-4 mr-2" />
             {previewUrl ? 'Change Logo' : 'Upload Logo'}
           </Button>
-          
+
           {previewUrl && (
             <Button
               type="button"

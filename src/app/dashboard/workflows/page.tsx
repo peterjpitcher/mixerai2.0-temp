@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy, Eye, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { touchFriendly } from '@/lib/utils/touch-target';
 import { Badge } from '@/components/ui/badge';
@@ -189,10 +189,10 @@ export default function WorkflowsPage() {
       header: "Brand",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <BrandIcon 
-            name={row.brand_name} 
+          <BrandIcon
+            name={row.brand_name}
             color={row.brand_color}
-            logoUrl={row.brand_logo_url} 
+            logoUrl={row.brand_logo_url}
             size="sm"
           />
           <span>{row.brand_name}</span>
@@ -234,7 +234,7 @@ export default function WorkflowsPage() {
       header: "Actions",
       cell: ({ row }) => {
         const canManage = isGlobalAdmin || currentUser?.brand_permissions?.some(p => p.brand_id === row.brand_id && p.role === 'admin');
-        
+
         return (
           <div className="flex items-center justify-end">
             <DropdownMenu>
@@ -275,7 +275,7 @@ export default function WorkflowsPage() {
                       }}
                       disabled={isDuplicating === row.id}
                     >
-                      <Copy className="mr-2 h-4 w-4" /> 
+                      <Copy className="mr-2 h-4 w-4" />
                       {isDuplicating === row.id ? 'Duplicating...' : 'Duplicate'}
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -390,7 +390,7 @@ export default function WorkflowsPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Workflows" }]} />
@@ -407,7 +407,7 @@ export default function WorkflowsPage() {
           ) : null
         }
       />
-      
+
       {error && canAccessPage ? (
         <ErrorState />
       ) : allWorkflows.length === 0 && canAccessPage ? (

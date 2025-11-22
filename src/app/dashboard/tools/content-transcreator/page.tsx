@@ -12,7 +12,7 @@ import { Loader2, ClipboardCopy, Globe, AlertTriangle, Briefcase, History, Exter
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandIcon } from '@/components/features/brands/brand-icon';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
@@ -80,7 +80,7 @@ export default function ContentTransCreatorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<{ transCreatedContent: string, targetLanguage: string, targetCountry: string } | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
-  
+
   // Batch mode states
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [batchContent, setBatchContent] = useState('');
@@ -103,7 +103,7 @@ export default function ContentTransCreatorPage() {
   const groupHistoryByBatch = useCallback((items: ToolRunHistoryItem[]): BatchGroup[] => {
     const batchMap = new Map<string, ToolRunHistoryItem[]>();
     const singleRuns: ToolRunHistoryItem[] = [];
-    
+
     // Group items by batch_id
     items.forEach(item => {
       if (item.batch_id) {
@@ -114,15 +114,15 @@ export default function ContentTransCreatorPage() {
         singleRuns.push(item);
       }
     });
-    
+
     // Create BatchGroup objects
     const groups: BatchGroup[] = [];
-    
+
     // Process batch groups
     batchMap.forEach((items, batch_id) => {
       // Sort items by batch_sequence
       const sortedItems = items.sort((a, b) => (a.batch_sequence || 0) - (b.batch_sequence || 0));
-      
+
       const group: BatchGroup = {
         batch_id,
         items: sortedItems,
@@ -132,7 +132,7 @@ export default function ContentTransCreatorPage() {
         failure_count: sortedItems.filter(item => item.status === 'failure').length,
         brands: []
       };
-      
+
       // Extract unique brands
       const brandSet = new Map<string, string>();
       sortedItems.forEach(item => {
@@ -143,11 +143,11 @@ export default function ContentTransCreatorPage() {
           }
         }
       });
-      
+
       group.brands = Array.from(brandSet.entries()).map(([id, name]) => ({ id, name }));
       groups.push(group);
     });
-    
+
     // Add single runs as individual batch groups
     singleRuns.forEach(item => {
       const group: BatchGroup = {
@@ -159,17 +159,17 @@ export default function ContentTransCreatorPage() {
         failure_count: item.status === 'failure' ? 1 : 0,
         brands: []
       };
-      
+
       if (item.brand_id && brands.length > 0) {
         const brand = brands.find(b => b.id === item.brand_id);
         if (brand) {
           group.brands = [{ id: brand.id, name: brand.name }];
         }
       }
-      
+
       groups.push(group);
     });
-    
+
     // Sort groups by timestamp (most recent first)
     return groups.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [brands]);
@@ -254,12 +254,12 @@ export default function ContentTransCreatorPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!hasAccess) {
       toast.error("You do not have permission to use this tool.");
       return;
     }
-    
+
     if (isBatchMode) {
       // Batch mode processing
       if (!batchContent.trim()) {
@@ -270,16 +270,16 @@ export default function ContentTransCreatorPage() {
         toast.error('Please select a target brand. The brand must have language and country configured.');
         return;
       }
-      
+
       setIsLoading(true);
       setBatchResults([]);
-      
+
       try {
         // Split content by lines and filter out empty lines
         const contentItems = batchContent.split('\n').filter(line => line.trim());
         const batchId = crypto.randomUUID();
         const results: typeof batchResults = [];
-        
+
         // Process each item
         for (let i = 0; i < contentItems.length; i++) {
           const contentItem = contentItems[i];
@@ -297,9 +297,9 @@ export default function ContentTransCreatorPage() {
                 batch_sequence: i + 1
               }),
             });
-            
+
             const data = await response.json();
-            
+
             if (!response.ok) {
               results.push({
                 content: contentItem,
@@ -318,11 +318,11 @@ export default function ContentTransCreatorPage() {
             });
           }
         }
-        
+
         setBatchResults(results);
         const successCount = results.filter(r => r.transCreatedContent).length;
         const failureCount = results.filter(r => r.error).length;
-        
+
         if (successCount > 0) {
           toast.success(`Batch processing complete: ${successCount} succeeded, ${failureCount} failed`);
         } else {
@@ -345,10 +345,10 @@ export default function ContentTransCreatorPage() {
         toast.error('Please select a target brand. The brand must have language and country configured.');
         return;
       }
-      
+
       setIsLoading(true);
       setResults(null);
-      
+
       try {
         const response = await apiFetch('/api/tools/content-transcreator', {
           method: 'POST',
@@ -361,20 +361,20 @@ export default function ContentTransCreatorPage() {
             brand_id: selectedBrandId,
           }),
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(data.error || 'Failed to trans-create content.');
         }
-        
+
         if (data.success) {
           setResults({
             transCreatedContent: data.transCreatedContent,
             targetLanguage: data.targetLanguage,
             targetCountry: data.targetCountry,
           });
-          
+
           toast.success('Content has been successfully trans-created.');
         } else {
           throw new Error(data.error || 'Failed to trans-create content.');
@@ -388,7 +388,7 @@ export default function ContentTransCreatorPage() {
       }
     }
   };
-  
+
   const handleCopyContent = () => {
     if (results?.transCreatedContent) {
       copyToClipboard(results.transCreatedContent);
@@ -422,7 +422,7 @@ export default function ContentTransCreatorPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs 
+      <Breadcrumbs
         items={[
           { label: 'Dashboard', href: '/dashboard' },
           { label: 'Tools', href: '/dashboard/tools' },
@@ -466,7 +466,7 @@ export default function ContentTransCreatorPage() {
                   </div>
                   <div>
                     <Label htmlFor="target-brand" className="flex items-center">
-                      <Briefcase className="mr-2 h-4 w-4 text-muted-foreground"/> Target Brand <span className="text-destructive ml-1">*</span>
+                      <Briefcase className="mr-2 h-4 w-4 text-muted-foreground" /> Target Brand <span className="text-destructive ml-1">*</span>
                     </Label>
                     {isLoadingBrands ? (
                       <Skeleton className="h-10 w-full" />
@@ -510,12 +510,12 @@ export default function ContentTransCreatorPage() {
 
                 <div>
                   <Label htmlFor="content">
-                    {isBatchMode ? 'Content Items (one per line)' : 'Content to Trans-create (Max 5000 characters)'} 
+                    {isBatchMode ? 'Content Items (one per line)' : 'Content to Trans-create (Max 5000 characters)'}
                     <span className="text-destructive ml-1">*</span>
                   </Label>
                   <Textarea
                     id="content"
-                    placeholder={isBatchMode 
+                    placeholder={isBatchMode
                       ? "Enter content items, one per line...\n\nExample:\nFirst item to translate\nSecond item to translate\nThird item to translate"
                       : "Enter your original content here..."
                     }
@@ -543,9 +543,9 @@ export default function ContentTransCreatorPage() {
                     </p>
                   )}
                 </div>
-                <Button 
-                  type="submit" 
-                  disabled={isLoading || (isBatchMode ? !batchContent.trim() : !content) || !selectedBrandId || (brands.length === 0 && !isLoadingBrands)} 
+                <Button
+                  type="submit"
+                  disabled={isLoading || (isBatchMode ? !batchContent.trim() : !content) || !selectedBrandId || (brands.length === 0 && !isLoadingBrands)}
                   className="w-full sm:w-auto"
                 >
                   {isLoading ? (
@@ -598,9 +598,9 @@ export default function ContentTransCreatorPage() {
                         )}
                       </div>
                       {result.transCreatedContent && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
+                        <Button
+                          size="sm"
+                          variant="outline"
                           className="mt-2"
                           onClick={() => {
                             copyToClipboard(result.transCreatedContent!);
@@ -651,8 +651,8 @@ export default function ContentTransCreatorPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Length Change:</span>
                       <Badge variant={
-                        Math.abs(((results.transCreatedContent.length - content.length) / content.length) * 100) > 20 
-                          ? "outline" 
+                        Math.abs(((results.transCreatedContent.length - content.length) / content.length) * 100) > 20
+                          ? "outline"
                           : "secondary"
                       }>
                         {results.transCreatedContent.length > content.length ? '+' : ''}
@@ -661,7 +661,7 @@ export default function ContentTransCreatorPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <Textarea value={results.transCreatedContent} readOnly rows={10} className="min-h-[200px]" />
               </CardContent>
               <CardFooter>
@@ -674,7 +674,7 @@ export default function ContentTransCreatorPage() {
         </div>
 
         <div className="lg:col-span-1 space-y-6">
-          {/* Run History Section - now in the second column for lg screens */} 
+          {/* Run History Section - now in the second column for lg screens */}
           <Card>
             <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -767,7 +767,7 @@ export default function ContentTransCreatorPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       {expandedBatches.has(group.batch_id) && (
                         <div className="border-t">
                           <Table>

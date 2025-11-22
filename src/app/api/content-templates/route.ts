@@ -8,6 +8,7 @@ import { validateRequest, commonSchemas } from '@/lib/api/validation';
 import { InputFieldSchema, OutputFieldSchema, TemplateFieldsSchema } from '@/lib/schemas/template';
 import type { Json } from '@/types/supabase';
 import { isSystemTemplateId } from '@/lib/templates/system-templates';
+import { generateTemplateDescription } from '@/lib/ai/generate-template-description';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -38,26 +39,6 @@ async function getAccessibleBrandIds(
   return (data || [])
     .map(record => record.brand_id)
     .filter((brandId): brandId is string => Boolean(brandId));
-}
-
-function resolveInternalApiUrl(request: NextRequest, path: string): URL | null {
-  const candidates = [
-    request?.nextUrl?.origin,
-    process.env.APP_URL,
-    process.env.NEXT_PUBLIC_APP_URL,
-  ].filter((value): value is string => Boolean(value));
-
-  for (const candidate of candidates) {
-    try {
-      const base = new URL(candidate);
-      return new URL(path, base);
-    } catch {
-      // Skip invalid candidates and continue searching for a usable origin.
-      continue;
-    }
-  }
-
-  return null;
 }
 
 // Validation schema for creating a template
@@ -342,31 +323,17 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: Authentic
     
     let generatedDescription = data.description || '';
     try {
-      const inputFieldNames = (data.inputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
-      const outputFieldNames = (data.outputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
+      const inputFieldNames = (data.inputFields || []).map((f) => f.name as string).filter(Boolean);
+      const outputFieldNames = (data.outputFields || []).map((f) => f.name as string).filter(Boolean);
 
-      const aiEndpointUrl = resolveInternalApiUrl(request, '/api/ai/generate-template-description');
-
-      if (!aiEndpointUrl) {
-        console.warn('[content-templates][POST] Unable to determine origin for AI description request. Skipping generation.');
-      } else {
-        const aiDescriptionResponse = await fetch(aiEndpointUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templateName: data.name,
-          inputFields: inputFieldNames,
-          outputFields: outputFieldNames,
-          brand_id: data.brand_id ?? undefined,
-        }),
+      const generatedDescriptionResult = await generateTemplateDescription({
+        templateName: data.name,
+        inputFields: inputFieldNames,
+        outputFields: outputFieldNames
       });
 
-      if (aiDescriptionResponse.ok) {
-        const aiData = await aiDescriptionResponse.json();
-        if (aiData.success && aiData.description) {
-          generatedDescription = aiData.description;
-        }
-      }
+      if (generatedDescriptionResult) {
+        generatedDescription = generatedDescriptionResult;
       }
     } catch {
       // console.warn('Error calling AI template description generation service:', aiError);

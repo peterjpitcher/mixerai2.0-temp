@@ -73,7 +73,7 @@ export default function ProductsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const productsResponse = await fetch('/api/products?limit=1000');
+        const productsResponse = await apiFetch('/api/products?limit=1000');
         if (!productsResponse.ok) {
           const errorData = await productsResponse.json().catch(() => ({}));
           throw new Error(errorData.error || 'Failed to fetch products');
@@ -86,7 +86,7 @@ export default function ProductsPage() {
           throw new Error(productsData.error || 'Failed to parse products data');
         }
 
-        const brandsResponse = await fetch('/api/master-claim-brands');
+        const brandsResponse = await apiFetch('/api/master-claim-brands');
         if (!brandsResponse.ok) {
           const errorData = await brandsResponse.json().catch(() => ({}));
           // Log this error but don't block products from loading

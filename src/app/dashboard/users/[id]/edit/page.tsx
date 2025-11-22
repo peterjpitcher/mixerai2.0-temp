@@ -103,7 +103,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       setIsLoadingUserSession(true);
       setUserSessionError(null);
       try {
-        const response = await fetch('/api/me');
+        const response = await apiFetch('/api/me');
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -149,7 +149,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         setIsLoading(true);
         
         // Fetch user details
-        const userResponse = await fetch(`/api/users/${params.id}`);
+        const userResponse = await apiFetch(`/api/users/${params.id}`);
         
         if (!userResponse.ok) {
           if (userResponse.status === 404) {
@@ -174,7 +174,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         let keepFetching = true;
 
         while (keepFetching) {
-          const response = await fetch(`/api/brands?page=${page}&limit=${pageSize}`);
+          const response = await apiFetch(`/api/brands?page=${page}&limit=${pageSize}`);
           if (!response.ok) {
             const errorBody = await response.json().catch(() => ({}));
             const message =

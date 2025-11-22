@@ -458,7 +458,7 @@ export default function ClaimsPreviewPage() {
     try {
       let apiUrl = `/api/claims/matrix?countryCode=${selectedCountry}`;
       if (selectedBrandId !== "all") apiUrl += `&masterBrandId=${selectedBrandId}`;
-      const response = await fetch(apiUrl);
+      const response = await apiFetch(apiUrl);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || "Failed to fetch claims matrix data.");
@@ -482,8 +482,8 @@ export default function ClaimsPreviewPage() {
       setIsLoadingCountries(true);
       try {
         const [brandsRes, countriesRes] = await Promise.all([
-          fetch('/api/master-claim-brands'),
-          fetch('/api/countries')
+          apiFetch('/api/master-claim-brands'),
+          apiFetch('/api/countries')
         ]);
 
         if (!brandsRes.ok) throw new Error("Failed to fetch brands for filter.");

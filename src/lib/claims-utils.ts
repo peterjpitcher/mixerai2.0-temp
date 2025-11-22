@@ -736,7 +736,6 @@ export function dedupeByFinalText(rows: EffectiveClaim[]): EffectiveClaim[] {
       p: precedenceOf(ec),
       s: levelScore((ec.source_level as SourceLevel) || 'none'),
     };
-
     const existing = keep.get(mapKey);
     if (!existing) {
       keep.set(mapKey, { claim: ec, priority: incomingPriority, normalizedText, mapKey });
